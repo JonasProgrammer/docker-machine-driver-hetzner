@@ -1,19 +1,55 @@
 package driver
 
 import (
+	"fmt"
+	"os"
+
+	"io/ioutil"
+
+	"net"
+
+	"time"
+
 	"github.com/docker/machine/libmachine/drivers"
-	"github.com/docker/machine/libmachine/ssh"
+	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnflag"
+	"github.com/docker/machine/libmachine/mcnutils"
+	mcnssh "github.com/docker/machine/libmachine/ssh"
+	"github.com/docker/machine/libmachine/state"
+	"github.com/jonasprogrammer/docker-machine-driver-hetzner/driver/hetzner"
+	"golang.org/x/crypto/ssh"
 )
 
 type Driver struct {
 	*drivers.BaseDriver
 
-	SSHKeyPair *ssh.KeyPair
+	AccessToken   string
+	Image         string
+	Type          string
+	Location      string
+	KeyID         int
+	IsExistingKey bool
+	originalKey   string
+	ServerID      int
 }
+
+const (
+	defaultImage = "debian-9"
+	defaultType  = "g2-local"
+
+	flagApiToken  = "hetzner-api-token"
+	flagImage     = "hetzner-image"
+	flagType      = "hetzner-server-type"
+	flagLocation  = "hetzner-server-location"
+	flagExKeyId   = "hetzner-existing-key-id"
+	flagExKeyPath = "hetzner-existing-key-path"
+)
 
 func NewDriver() *Driver {
 	return &Driver{
+		Image:         defaultImage,
+		Type:          defaultType,
+		IsExistingKey: false,
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser: drivers.DefaultSSHUser,
 			SSHPort: drivers.DefaultSSHPort,
@@ -25,19 +61,297 @@ func (d *Driver) DriverName() string {
 	return "hetzner"
 }
 
-const (
-	defaultImage    = "debian-9"
-	defaultType     = "g2-local"
-	defaultLocation = "fsn1"
-)
-
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	return []mcnflag.Flag{
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_API_TOKEN",
-			Name:   "hetzner-api-token",
-			Usage:  "Your project-specific Hetzner API token",
+			Name:   flagApiToken,
+			Usage:  "Project-specific Hetzner API token",
+			Value:  "",
+		},
+
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_IMAGE",
+			Name:   flagImage,
+			Usage:  "Image to use for server creation",
+			Value:  defaultImage,
+		},
+
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_TYPE",
+			Name:   flagType,
+			Usage:  "Server type to create",
+			Value:  defaultType,
+		},
+
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_LOCATION",
+			Name:   flagLocation,
+			Usage:  "Location to create machine at",
+			Value:  "",
+		},
+
+		mcnflag.IntFlag{
+			EnvVar: "HETZNER_EXISTING_KEY_ID",
+			Name:   flagExKeyId,
+			Usage:  "Existing key ID to use for server; requires --hetzner-existing-key-path",
+			Value:  0,
+		},
+
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_EXISTING_KEY_PATH",
+			Name:   flagExKeyPath,
+			Usage:  "Path to existing key (new public key will be created unless --hetzner-existing-key-id is specified)",
 			Value:  "",
 		},
 	}
+}
+
+func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
+	d.AccessToken = opts.String(flagApiToken)
+	d.Image = opts.String(flagImage)
+	d.Location = opts.String(flagLocation)
+	d.Type = opts.String(flagType)
+	d.KeyID = opts.Int(flagExKeyId)
+	d.IsExistingKey = d.KeyID != 0
+	d.originalKey = opts.String(flagExKeyPath)
+
+	d.SetSwarmConfigFromFlags(opts)
+
+	if d.AccessToken == "" {
+		return fmt.Errorf("hetnzer erquires --%v to be set", flagApiToken)
+	}
+
+	return nil
+}
+
+func (d *Driver) PreCreateCheck() error {
+	// TODO: Validate location, type and image to exist
+
+	if d.IsExistingKey {
+		if d.originalKey == "" {
+			return fmt.Errorf("specifing an existing key ID requires the existing key path to be set as well")
+		}
+
+		key, err := d.getClient().GetSSHKey(d.KeyID)
+
+		if err != nil {
+			return err
+		}
+
+		buf, err := ioutil.ReadFile(d.originalKey + ".pub")
+		if err != nil {
+			return err
+		}
+
+		pubk, err := ssh.ParsePublicKey(buf)
+
+		if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
+			key.Fingerprint != ssh.FingerprintSHA256(pubk) {
+			return fmt.Errorf("remote key %d does not fit with local key %s", d.KeyID, d.originalKey)
+		}
+	}
+
+	return nil
+}
+
+func (d *Driver) Create() error {
+	if d.KeyID == 0 {
+		if d.originalKey != "" {
+			log.Debugf("Copying SSH key...")
+			if err := d.copySSHKeyPair(d.originalKey); err != nil {
+				return err
+			}
+		} else {
+			log.Debugf("Generating SSH key...")
+			if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
+				return err
+			}
+		}
+
+		log.Infof("Creating SSH key...")
+
+		buf, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
+		if err != nil {
+			return err
+		}
+
+		key, err := d.getClient().CreateSSHKey(d.GetMachineName(), string(buf))
+		if err != nil {
+			return err
+		}
+
+		d.KeyID = key.Id
+	}
+
+	log.Infof("Creating Hetzner server...")
+
+	srv, act, err := d.getClient().CreateServer(d.GetMachineName(), d.Type, d.Image, d.Location, d.KeyID)
+
+	if err != nil {
+		return err
+	}
+
+	log.Debugf(" -> Creating action %d, server %s[%d]", act.Id, srv.Name, srv.Id)
+
+	for {
+		act, err = d.getClient().GetAction(act.Id)
+
+		if err != nil {
+			return err
+		}
+
+		if act.Status == "success" {
+			log.Debugf(" -> Finished create action %d", act.Id)
+			break
+		} else if act.Status == "running" {
+			log.Debugf(" -> Create action[%d]: %d %%", act.Id, act.Progress)
+		} else if act.Status == "error" {
+			if act.Error != nil {
+				return fmt.Errorf("create action %d %s: %s", act.Id, act.Error.Code, act.Error.Message)
+			} else {
+				return fmt.Errorf("create action %d: failed for unknown reason", act.Id)
+			}
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	d.ServerID = srv.Id
+	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Name, srv.Id)
+
+	for {
+		srvstate, err := d.GetState()
+
+		if err != nil {
+			return err
+		}
+
+		if srvstate == state.Running {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	log.Debugf(" -> Server %s[%d] ready", srv.Name, srv.Id)
+	d.IPAddress = srv.PublicNet.IPv4.IP
+
+	return nil
+}
+
+func (d *Driver) GetSSHHostname() (string, error) {
+	return d.GetIP()
+}
+
+func (d *Driver) GetURL() (string, error) {
+	if err := drivers.MustBeRunning(d); err != nil {
+		return "", err
+	}
+
+	ip, err := d.GetIP()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, "2376")), nil
+}
+
+func (d *Driver) GetState() (state.State, error) {
+	srv, err := d.getClient().GetServer(d.ServerID)
+
+	if err != nil {
+		return state.None, err
+	}
+
+	switch srv.Status {
+	case "initializing":
+	case "starting":
+		return state.Starting, nil
+	case "running":
+		return state.Running, nil
+	case "stopping":
+		return state.Stopping, nil
+	case "off":
+		return state.Stopped, nil
+	}
+	return state.None, nil
+}
+
+func (d *Driver) Kill() error {
+	panic("implement me")
+}
+
+func (d *Driver) Remove() error {
+	act, err := d.getClient().DeleteServer(d.ServerID)
+
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Destroying server %d, action %d...", d.ServerID, act.Id)
+
+	for {
+		act, err = d.getClient().GetAction(act.Id)
+
+		if err != nil {
+			return err
+		}
+
+		if act.Status == "success" {
+			log.Infof(" -> Finished destroy action %d", act.Id)
+			break
+		} else if act.Status == "running" {
+			log.Infof(" -> Destroy action[%d]: %d %%", act.Id, act.Progress)
+		} else if act.Status == "error" {
+			if act.Error != nil {
+				return fmt.Errorf("destroy action %d %s: %s", act.Id, act.Error.Code, act.Error.Message)
+			} else {
+				return fmt.Errorf("destroy action %d: failed for unknown reason", act.Id)
+			}
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	if !d.IsExistingKey {
+		log.Infof(" -> Destroying SSHkey %d...", d.KeyID)
+		if err := d.getClient().DeleteSSHKey(d.KeyID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *Driver) Restart() error {
+	panic("implement me")
+}
+
+func (d *Driver) Start() error {
+	panic("implement me")
+}
+
+func (d *Driver) Stop() error {
+	panic("implement me")
+}
+
+func (d *Driver) getClient() *hetzner.Client {
+	return hetzner.NewClient(d.AccessToken)
+}
+
+func (d *Driver) copySSHKeyPair(src string) error {
+	if err := mcnutils.CopyFile(src, d.GetSSHKeyPath()); err != nil {
+		return fmt.Errorf("unable to copy ssh key: %s", err)
+	}
+
+	if err := mcnutils.CopyFile(src+".pub", d.GetSSHKeyPath()+".pub"); err != nil {
+		return fmt.Errorf("unable to copy ssh public key: %s", err)
+	}
+
+	if err := os.Chmod(d.GetSSHKeyPath(), 0600); err != nil {
+		return fmt.Errorf("unable to set permissions on the ssh key: %s", err)
+	}
+
+	return nil
 }
