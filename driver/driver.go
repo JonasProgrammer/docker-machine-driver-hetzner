@@ -144,7 +144,11 @@ func (d *Driver) PreCreateCheck() error {
 			return err
 		}
 
-		pubk, err := ssh.ParsePublicKey(buf)
+		// Will also parse `ssh-rsa w309jwf0e39jf asdf` public keys
+		pubk, _, _, _, err := ssh.ParseAuthorizedKey(buf)
+		if err != nil {
+			return err
+		}
 
 		if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
 			key.Fingerprint != ssh.FingerprintSHA256(pubk) {
@@ -156,19 +160,19 @@ func (d *Driver) PreCreateCheck() error {
 }
 
 func (d *Driver) Create() error {
-	if d.KeyID == 0 {
-		if d.originalKey != "" {
-			log.Debugf("Copying SSH key...")
-			if err := d.copySSHKeyPair(d.originalKey); err != nil {
-				return err
-			}
-		} else {
-			log.Debugf("Generating SSH key...")
-			if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-				return err
-			}
+	if d.originalKey != "" {
+		log.Debugf("Copying SSH key...")
+		if err := d.copySSHKeyPair(d.originalKey); err != nil {
+			return err
 		}
+	} else {
+		log.Debugf("Generating SSH key...")
+		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
+			return err
+		}
+	}
 
+	if d.KeyID == 0 {
 		log.Infof("Creating SSH key...")
 
 		buf, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
