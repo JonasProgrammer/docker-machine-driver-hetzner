@@ -32,8 +32,8 @@ The Hetzner Cloud driver will use `debian-9` as the default image and `g2-local`
 
 #### Existing SSH keys
 
-When you specify the `--hetzner-existing-key-path` option, the driver will attempt to copy the `*(specified file name)*`
-and `*(specified file name).pub*` to the machine's store path. They public key file's permissions will be set according
+When you specify the `--hetzner-existing-key-path` option, the driver will attempt to copy `(specified file name)`
+and `(specified file name).pub` to the machine's store path. They public key file's permissions will be set according
 to your current `umask` and the private key file will have `600` permissions.
 
 When you additionally specify the `--hetzner-existing-key-id` option, the driver will not create an SSH key using the API
