@@ -174,7 +174,7 @@ type createServerRequest struct {
 	Name      string `json:"name"`
 	Type      string `json:"server_type"`
 	Image     string `json:"image"`
-	Location  string `json:"type,omitempty"`
+	Location  string `json:"location,omitempty"`
 	SSHKeyIDs []int  `json:"ssh_keys,omitempty"`
 }
 
@@ -240,4 +240,30 @@ func (c *Client) DeleteServer(id int) (*Action, error) {
 	}
 
 	return extractAction(resp.Body())
+}
+
+func (c *Client) serverAction(id int, action string) (*Action, error) {
+	resp, err := c.client.R().Post(fmt.Sprintf("servers/%d/actions/%s", id, action))
+
+	if err != nil {
+		return nil, extractPrettyError(resp.Body(), err)
+	}
+
+	return extractAction(resp.Body())
+}
+
+func (c *Client) PowerOnServer(id int) (*Action, error) {
+	return c.serverAction(id, "poweron")
+}
+
+func (c *Client) RebootServer(id int) (*Action, error) {
+	return c.serverAction(id, "reboot")
+}
+
+func (c *Client) ShutdownServer(id int) (*Action, error) {
+	return c.serverAction(id, "shutdown")
+}
+
+func (c *Client) PowerOffServer(id int) (*Action, error) {
+	return c.serverAction(id, "poweroff")
 }

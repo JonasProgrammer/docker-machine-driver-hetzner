@@ -193,32 +193,15 @@ func (d *Driver) Create() error {
 	srv, act, err := d.getClient().CreateServer(d.GetMachineName(), d.Type, d.Image, d.Location, d.KeyID)
 
 	if err != nil {
+		d.destroyDanglingKey()
 		return err
 	}
 
-	log.Debugf(" -> Creating action %d, server %s[%d]", act.Id, srv.Name, srv.Id)
+	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Name, srv.Id, act.Command, act.Id)
 
-	for {
-		act, err = d.getClient().GetAction(act.Id)
-
-		if err != nil {
-			return err
-		}
-
-		if act.Status == "success" {
-			log.Debugf(" -> Finished create action %d", act.Id)
-			break
-		} else if act.Status == "running" {
-			log.Debugf(" -> Create action[%d]: %d %%", act.Id, act.Progress)
-		} else if act.Status == "error" {
-			if act.Error != nil {
-				return fmt.Errorf("create action %d %s: %s", act.Id, act.Error.Code, act.Error.Message)
-			} else {
-				return fmt.Errorf("create action %d: failed for unknown reason", act.Id)
-			}
-		}
-
-		time.Sleep(1 * time.Second)
+	if err = d.waitForAction(act); err != nil {
+		d.destroyDanglingKey()
+		return err
 	}
 
 	d.ServerID = srv.Id
@@ -228,6 +211,7 @@ func (d *Driver) Create() error {
 		srvstate, err := d.GetState()
 
 		if err != nil {
+			d.destroyDanglingKey()
 			return err
 		}
 
@@ -242,6 +226,12 @@ func (d *Driver) Create() error {
 	d.IPAddress = srv.PublicNet.IPv4.IP
 
 	return nil
+}
+
+func (d *Driver) destroyDanglingKey() {
+	if !d.IsExistingKey && d.KeyID != 0 {
+		d.getClient().DeleteSSHKey(d.KeyID)
+	}
 }
 
 func (d *Driver) GetSSHHostname() (string, error) {
@@ -282,44 +272,23 @@ func (d *Driver) GetState() (state.State, error) {
 	return state.None, nil
 }
 
-func (d *Driver) Kill() error {
-	panic("implement me")
-}
-
 func (d *Driver) Remove() error {
-	act, err := d.getClient().DeleteServer(d.ServerID)
-
-	if err != nil {
-		return err
-	}
-
-	log.Infof(" -> Destroying server %d, action %d...", d.ServerID, act.Id)
-
-	for {
-		act, err = d.getClient().GetAction(act.Id)
+	if d.ServerID != 0 {
+		act, err := d.getClient().DeleteServer(d.ServerID)
 
 		if err != nil {
 			return err
 		}
 
-		if act.Status == "success" {
-			log.Infof(" -> Finished destroy action %d", act.Id)
-			break
-		} else if act.Status == "running" {
-			log.Infof(" -> Destroy action[%d]: %d %%", act.Id, act.Progress)
-		} else if act.Status == "error" {
-			if act.Error != nil {
-				return fmt.Errorf("destroy action %d %s: %s", act.Id, act.Error.Code, act.Error.Message)
-			} else {
-				return fmt.Errorf("destroy action %d: failed for unknown reason", act.Id)
-			}
-		}
+		log.Infof(" -> Destroying server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
 
-		time.Sleep(1 * time.Second)
+		if err = d.waitForAction(act); err != nil {
+			return err
+		}
 	}
 
 	if !d.IsExistingKey {
-		log.Infof(" -> Destroying SSHkey %d...", d.KeyID)
+		log.Infof(" -> Destroying SSHKey %d...", d.KeyID)
 		if err := d.getClient().DeleteSSHKey(d.KeyID); err != nil {
 			return err
 		}
@@ -329,15 +298,47 @@ func (d *Driver) Remove() error {
 }
 
 func (d *Driver) Restart() error {
-	panic("implement me")
+	act, err := d.getClient().RebootServer(d.ServerID)
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Rebooting server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+
+	return d.waitForAction(act)
 }
 
 func (d *Driver) Start() error {
-	panic("implement me")
+	act, err := d.getClient().PowerOnServer(d.ServerID)
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Starting server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+
+	return d.waitForAction(act)
 }
 
 func (d *Driver) Stop() error {
-	panic("implement me")
+	act, err := d.getClient().ShutdownServer(d.ServerID)
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Shutting down server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+
+	return d.waitForAction(act)
+}
+
+func (d *Driver) Kill() error {
+	act, err := d.getClient().PowerOffServer(d.ServerID)
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Powering off server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+
+	return d.waitForAction(act)
 }
 
 func (d *Driver) getClient() *hetzner.Client {
@@ -355,6 +356,33 @@ func (d *Driver) copySSHKeyPair(src string) error {
 
 	if err := os.Chmod(d.GetSSHKeyPath(), 0600); err != nil {
 		return fmt.Errorf("unable to set permissions on the ssh key: %s", err)
+	}
+
+	return nil
+}
+
+func (d *Driver) waitForAction(a *hetzner.Action) error {
+	for {
+		act, err := d.getClient().GetAction(a.Id)
+
+		if err != nil {
+			return err
+		}
+
+		if act.Status == "success" {
+			log.Debugf(" -> finished %s[%d]", act.Command, act.Id)
+			break
+		} else if act.Status == "running" {
+			log.Debugf(" -> %s[%d]: %d %%", act.Command, act.Id, act.Progress)
+		} else if act.Status == "error" {
+			if act.Error != nil {
+				return fmt.Errorf("%s[%d] %s: %s", act.Command, act.Id, act.Error.Code, act.Error.Message)
+			} else {
+				return fmt.Errorf("%s[%d]: failed for unknown reason", act.Command, act.Id)
+			}
+		}
+
+		time.Sleep(1 * time.Second)
 	}
 
 	return nil
