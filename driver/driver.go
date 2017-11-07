@@ -30,6 +30,7 @@ type Driver struct {
 	KeyID         int
 	IsExistingKey bool
 	originalKey   string
+	danglingKey   bool
 	ServerID      int
 }
 
@@ -50,6 +51,7 @@ func NewDriver() *Driver {
 		Image:         defaultImage,
 		Type:          defaultType,
 		IsExistingKey: false,
+		danglingKey:   false,
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser: drivers.DefaultSSHUser,
 			SSHPort: drivers.DefaultSSHPort,
@@ -186,6 +188,8 @@ func (d *Driver) Create() error {
 		}
 
 		d.KeyID = key.Id
+		d.danglingKey = true
+		defer d.destroyDanglingKey()
 	}
 
 	log.Infof("Creating Hetzner server...")
@@ -193,14 +197,12 @@ func (d *Driver) Create() error {
 	srv, act, err := d.getClient().CreateServer(d.GetMachineName(), d.Type, d.Image, d.Location, d.KeyID)
 
 	if err != nil {
-		d.destroyDanglingKey()
 		return err
 	}
 
 	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Name, srv.Id, act.Command, act.Id)
 
 	if err = d.waitForAction(act); err != nil {
-		d.destroyDanglingKey()
 		return err
 	}
 
@@ -211,7 +213,6 @@ func (d *Driver) Create() error {
 		srvstate, err := d.GetState()
 
 		if err != nil {
-			d.destroyDanglingKey()
 			return err
 		}
 
@@ -225,12 +226,15 @@ func (d *Driver) Create() error {
 	log.Debugf(" -> Server %s[%d] ready", srv.Name, srv.Id)
 	d.IPAddress = srv.PublicNet.IPv4.IP
 
+	d.danglingKey = false
+
 	return nil
 }
 
 func (d *Driver) destroyDanglingKey() {
-	if !d.IsExistingKey && d.KeyID != 0 {
+	if d.danglingKey && !d.IsExistingKey && d.KeyID != 0 {
 		d.getClient().DeleteSSHKey(d.KeyID)
+		d.KeyID = 0
 	}
 }
 
@@ -287,7 +291,7 @@ func (d *Driver) Remove() error {
 		}
 	}
 
-	if !d.IsExistingKey {
+	if !d.IsExistingKey && d.KeyID != 0 {
 		log.Infof(" -> Destroying SSHKey %d...", d.KeyID)
 		if err := d.getClient().DeleteSSHKey(d.KeyID); err != nil {
 			return err
