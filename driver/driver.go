@@ -16,22 +16,29 @@ import (
 	"github.com/docker/machine/libmachine/mcnutils"
 	mcnssh "github.com/docker/machine/libmachine/ssh"
 	"github.com/docker/machine/libmachine/state"
-	"github.com/jonasprogrammer/docker-machine-driver-hetzner/driver/hetzner"
 	"golang.org/x/crypto/ssh"
+
+	"context"
+	"github.com/hetznercloud/hcloud-go/hcloud"
 )
 
 type Driver struct {
 	*drivers.BaseDriver
 
-	AccessToken   string
-	Image         string
-	Type          string
-	Location      string
-	KeyID         int
-	IsExistingKey bool
-	originalKey   string
-	danglingKey   bool
-	ServerID      int
+	AccessToken    string
+	Image          string
+	cachedImage    *hcloud.Image
+	Type           string
+	cachedType     *hcloud.ServerType
+	Location       string
+	cachedLocation *hcloud.Location
+	KeyID          int
+	cachedKey      *hcloud.SSHKey
+	IsExistingKey  bool
+	originalKey    string
+	danglingKey    bool
+	ServerID       int
+	cachedServer   *hcloud.Server
 }
 
 const (
@@ -128,14 +135,12 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 }
 
 func (d *Driver) PreCreateCheck() error {
-	// TODO: Validate location, type and image to exist
-
 	if d.IsExistingKey {
 		if d.originalKey == "" {
 			return fmt.Errorf("specifing an existing key ID requires the existing key path to be set as well")
 		}
 
-		key, err := d.getClient().GetSSHKey(d.KeyID)
+		key, err := d.getKey()
 
 		if err != nil {
 			return err
@@ -156,6 +161,18 @@ func (d *Driver) PreCreateCheck() error {
 			key.Fingerprint != ssh.FingerprintSHA256(pubk) {
 			return fmt.Errorf("remote key %d does not fit with local key %s", d.KeyID, d.originalKey)
 		}
+	}
+
+	if _, err := d.getType(); err != nil {
+		return err
+	}
+
+	if _, err := d.getImage(); err != nil {
+		return err
+	}
+
+	if _, err := d.getLocation(); err != nil {
+		return err
 	}
 
 	return nil
@@ -182,32 +199,57 @@ func (d *Driver) Create() error {
 			return err
 		}
 
-		key, err := d.getClient().CreateSSHKey(d.GetMachineName(), string(buf))
+		keyopts := hcloud.SSHKeyCreateOpts{
+			Name:      d.GetMachineName(),
+			PublicKey: string(buf),
+		}
+
+		key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
+
 		if err != nil {
 			return err
 		}
 
-		d.KeyID = key.Id
+		d.KeyID = key.ID
 		d.danglingKey = true
+
 		defer d.destroyDanglingKey()
 	}
 
 	log.Infof("Creating Hetzner server...")
 
-	srv, act, err := d.getClient().CreateServer(d.GetMachineName(), d.Type, d.Image, d.Location, d.KeyID)
+	srvopts := hcloud.ServerCreateOpts{Name: d.GetMachineName()}
+
+	var err error
+	if srvopts.Location, err = d.getLocation(); err != nil {
+		return err
+	}
+	if srvopts.ServerType, err = d.getType(); err != nil {
+		return err
+	}
+	if srvopts.Image, err = d.getImage(); err != nil {
+		return err
+	}
+	if key, err := d.getKey(); err == nil {
+		srvopts.SSHKeys = append(srvopts.SSHKeys, key)
+	} else {
+		return err
+	}
+
+	srv, _, err := d.getClient().Server.Create(context.Background(), srvopts)
 
 	if err != nil {
 		return err
 	}
 
-	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Name, srv.Id, act.Command, act.Id)
+	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Server.Name, srv.Server.ID, srv.Action.Command, srv.Action.ID)
 
-	if err = d.waitForAction(act); err != nil {
+	if err = d.waitForAction(srv.Action); err != nil {
 		return err
 	}
 
-	d.ServerID = srv.Id
-	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Name, srv.Id)
+	d.ServerID = srv.Server.ID
+	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Server.Name, srv.Server.ID)
 
 	for {
 		srvstate, err := d.GetState()
@@ -223,8 +265,8 @@ func (d *Driver) Create() error {
 		time.Sleep(1 * time.Second)
 	}
 
-	log.Debugf(" -> Server %s[%d] ready", srv.Name, srv.Id)
-	d.IPAddress = srv.PublicNet.IPv4.IP
+	log.Debugf(" -> Server %s[%d] ready", srv.Server.Name, srv.Server.ID)
+	d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
 
 	d.danglingKey = false
 
@@ -233,7 +275,18 @@ func (d *Driver) Create() error {
 
 func (d *Driver) destroyDanglingKey() {
 	if d.danglingKey && !d.IsExistingKey && d.KeyID != 0 {
-		d.getClient().DeleteSSHKey(d.KeyID)
+		key, err := d.getKey()
+
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
+			log.Error(err)
+			return
+		}
+
 		d.KeyID = 0
 	}
 }
@@ -256,21 +309,18 @@ func (d *Driver) GetURL() (string, error) {
 }
 
 func (d *Driver) GetState() (state.State, error) {
-	srv, err := d.getClient().GetServer(d.ServerID)
+	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
 
 	if err != nil {
 		return state.None, err
 	}
 
 	switch srv.Status {
-	case "initializing":
-	case "starting":
+	case hcloud.ServerStatusInitializing:
 		return state.Starting, nil
-	case "running":
+	case hcloud.ServerStatusRunning:
 		return state.Running, nil
-	case "stopping":
-		return state.Stopping, nil
-	case "off":
+	case hcloud.ServerStatusOff:
 		return state.Stopped, nil
 	}
 	return state.None, nil
@@ -278,22 +328,29 @@ func (d *Driver) GetState() (state.State, error) {
 
 func (d *Driver) Remove() error {
 	if d.ServerID != 0 {
-		act, err := d.getClient().DeleteServer(d.ServerID)
+		srv, err := d.getServerHandle()
 
 		if err != nil {
 			return err
 		}
 
-		log.Infof(" -> Destroying server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+		log.Infof(" -> Destroying server %s[%d] in...", srv.Name, srv.ID)
 
-		if err = d.waitForAction(act); err != nil {
+		if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
 			return err
 		}
 	}
 
 	if !d.IsExistingKey && d.KeyID != 0 {
-		log.Infof(" -> Destroying SSHKey %d...", d.KeyID)
-		if err := d.getClient().DeleteSSHKey(d.KeyID); err != nil {
+		key, err := d.getKey()
+
+		if err != nil {
+			return err
+		}
+
+		log.Infof(" -> Destroying SSHKey %s[%d]...", key.Name, key.ID)
+
+		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
 			return err
 		}
 	}
@@ -302,51 +359,59 @@ func (d *Driver) Remove() error {
 }
 
 func (d *Driver) Restart() error {
-	act, err := d.getClient().RebootServer(d.ServerID)
+	srv, err := d.getServerHandle()
+
+	act, _, err := d.getClient().Server.Reboot(context.Background(), srv)
 	if err != nil {
 		return err
 	}
 
-	log.Infof(" -> Rebooting server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+	log.Infof(" -> Rebooting server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
 
 	return d.waitForAction(act)
 }
 
 func (d *Driver) Start() error {
-	act, err := d.getClient().PowerOnServer(d.ServerID)
+	srv, err := d.getServerHandle()
+
+	act, _, err := d.getClient().Server.Poweron(context.Background(), srv)
 	if err != nil {
 		return err
 	}
 
-	log.Infof(" -> Starting server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+	log.Infof(" -> Starting server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
 
 	return d.waitForAction(act)
 }
 
 func (d *Driver) Stop() error {
-	act, err := d.getClient().ShutdownServer(d.ServerID)
+	srv, err := d.getServerHandle()
+
+	act, _, err := d.getClient().Server.Shutdown(context.Background(), srv)
 	if err != nil {
 		return err
 	}
 
-	log.Infof(" -> Shutting down server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+	log.Infof(" -> Shutting down server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
 
 	return d.waitForAction(act)
 }
 
 func (d *Driver) Kill() error {
-	act, err := d.getClient().PowerOffServer(d.ServerID)
+	srv, err := d.getServerHandle()
+
+	act, _, err := d.getClient().Server.Poweroff(context.Background(), srv)
 	if err != nil {
 		return err
 	}
 
-	log.Infof(" -> Powering off server %d in %s[%d]...", d.ServerID, act.Command, act.Id)
+	log.Infof(" -> Powering off server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
 
 	return d.waitForAction(act)
 }
 
-func (d *Driver) getClient() *hetzner.Client {
-	return hetzner.NewClient(d.AccessToken)
+func (d *Driver) getClient() *hcloud.Client {
+	return hcloud.NewClient(hcloud.WithToken(d.AccessToken))
 }
 
 func (d *Driver) copySSHKeyPair(src string) error {
@@ -365,25 +430,95 @@ func (d *Driver) copySSHKeyPair(src string) error {
 	return nil
 }
 
-func (d *Driver) waitForAction(a *hetzner.Action) error {
+func (d *Driver) getLocation() (*hcloud.Location, error) {
+	if d.cachedLocation != nil {
+		return d.cachedLocation, nil
+	}
+
+	location, _, err := d.getClient().Location.GetByName(context.Background(), d.Location)
+
+	if err == nil {
+		d.cachedLocation = location
+	}
+
+	return location, err
+}
+
+func (d *Driver) getType() (*hcloud.ServerType, error) {
+	if d.cachedType != nil {
+		return d.cachedType, nil
+	}
+
+	stype, _, err := d.getClient().ServerType.GetByName(context.Background(), d.Type)
+
+	if err == nil {
+		d.cachedType = stype
+	}
+
+	return stype, err
+}
+
+func (d *Driver) getImage() (*hcloud.Image, error) {
+	if d.cachedImage != nil {
+		return d.cachedImage, nil
+	}
+
+	image, _, err := d.getClient().Image.GetByName(context.Background(), d.Image)
+
+	if err == nil {
+		d.cachedImage = image
+	}
+
+	return image, err
+}
+
+func (d *Driver) getKey() (*hcloud.SSHKey, error) {
+	if d.cachedKey != nil {
+		return d.cachedKey, nil
+	}
+
+	stype, _, err := d.getClient().SSHKey.GetByID(context.Background(), d.KeyID)
+
+	if err == nil {
+		d.cachedKey = stype
+	}
+
+	return stype, err
+}
+
+func (d *Driver) getServerHandle() (*hcloud.Server, error) {
+	if d.cachedServer != nil {
+		return d.cachedServer, nil
+	}
+
+	if d.ServerID == 0 {
+		return nil, fmt.Errorf("server ID was 0")
+	}
+
+	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
+
+	if err != nil {
+		d.cachedServer = srv
+	}
+
+	return srv, err
+}
+
+func (d *Driver) waitForAction(a *hcloud.Action) error {
 	for {
-		act, err := d.getClient().GetAction(a.Id)
+		act, _, err := d.getClient().Action.GetByID(context.Background(), a.ID)
 
 		if err != nil {
 			return err
 		}
 
-		if act.Status == "success" {
-			log.Debugf(" -> finished %s[%d]", act.Command, act.Id)
+		if act.Status == hcloud.ActionStatusSuccess {
+			log.Debugf(" -> finished %s[%d]", act.Command, act.ID)
 			break
-		} else if act.Status == "running" {
-			log.Debugf(" -> %s[%d]: %d %%", act.Command, act.Id, act.Progress)
-		} else if act.Status == "error" {
-			if act.Error != nil {
-				return fmt.Errorf("%s[%d] %s: %s", act.Command, act.Id, act.Error.Code, act.Error.Message)
-			} else {
-				return fmt.Errorf("%s[%d]: failed for unknown reason", act.Command, act.Id)
-			}
+		} else if act.Status == hcloud.ActionStatusRunning {
+			log.Debugf(" -> %s[%d]: %d %%", act.Command, act.ID, act.Progress)
+		} else if act.Status == hcloud.ActionStatusError {
+			return act.Error()
 		}
 
 		time.Sleep(1 * time.Second)
