@@ -43,7 +43,7 @@ type Driver struct {
 
 const (
 	defaultImage = "debian-9"
-	defaultType  = "g2-local"
+	defaultType  = "cx11"
 
 	flagApiToken  = "hetzner-api-token"
 	flagImage     = "hetzner-image"
