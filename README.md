@@ -24,11 +24,13 @@ and pass that to `docker-machine create` with the `--hetzner-api-token` option.
 -   `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list.
 -   `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list.
 -   `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
+**NOTICE: Beware that Hetzner does not reject invalid location names at the time of writing this; instead, a seemingly random location is chosen. Double check both the option value's
+spelling and the newly created server to make sure the desired location was chosen indeed.**
 -   `--hetzner-existing-key-path`: Use an existing (local) SSH key instead of generating a new keypair.
 -   `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
     see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
 
-The Hetzner Cloud driver will use `debian-9` as the default image and `g2-local` as the default type.
+The Hetzner Cloud driver will use `debian-9` as the default image and `cx11` as the default type.
 
 #### Existing SSH keys
 
@@ -51,7 +53,7 @@ was used during creation.
 | ----------------------------------- | --------------------------------- | -------------------------- |
 | **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               | -                          |
 | `--hetzner-image `                  | `HETZNER_IMAGE_IMAGE`             | `debian-9`                 |
-| `--hetzner-server-type`             | `HETZNER_TYPE`                    | `g2-local`                 |
+| `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
 | `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
