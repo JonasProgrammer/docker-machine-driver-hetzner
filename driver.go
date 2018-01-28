@@ -1,4 +1,4 @@
-package driver
+package main
 
 import (
 	"fmt"
@@ -75,7 +75,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_API_TOKEN",
 			Name:   flagApiToken,
-			Usage:  "Project-specific Hetzner API token",
+			Usage:  "Project-specific Hetzner API token (FOO)",
 			Value:  "",
 		},
 
