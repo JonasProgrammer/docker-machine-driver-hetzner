@@ -4,7 +4,7 @@ keywords: machine, hetzner, Hetzner Cloud, driver
 title: Hetzner Cloud
 ---
 
-Create Docker machines on [Hetzner Cloud](https://docs.hetzner.cloud/).
+Create [Docker machines](https://github.com/docker/machine) on [Hetzner Cloud](https://docs.hetzner.cloud/).
 
 You need to create a project-sepcific access token under `Access` > `API Tokens` in the project control panel
 and pass that to `docker-machine create` with the `--hetzner-api-token` option.
