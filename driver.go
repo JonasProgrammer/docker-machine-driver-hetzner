@@ -128,7 +128,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.SetSwarmConfigFromFlags(opts)
 
 	if d.AccessToken == "" {
-		return fmt.Errorf("hetnzer erquires --%v to be set", flagApiToken)
+		return fmt.Errorf("hetzner requires --%v to be set", flagApiToken)
 	}
 
 	return nil
@@ -159,7 +159,7 @@ func (d *Driver) PreCreateCheck() error {
 
 		if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
 			key.Fingerprint != ssh.FingerprintSHA256(pubk) {
-			return fmt.Errorf("remote key %d does not fit with local key %s", d.KeyID, d.originalKey)
+			return fmt.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
 		}
 	}
 
