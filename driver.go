@@ -75,7 +75,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_API_TOKEN",
 			Name:   flagApiToken,
-			Usage:  "Project-specific Hetzner API token (FOO)",
+			Usage:  "Project-specific Hetzner API token",
 			Value:  "",
 		},
 
