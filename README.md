@@ -1,10 +1,9 @@
----
-description: Hetzner Cloud driver for machine
-keywords: machine, hetzner, Hetzner Cloud, driver
-title: Hetzner Cloud
----
+# Hetzner Cloud Docker machine driver
 
-Create [Docker machines](https://github.com/docker/machine) on [Hetzner Cloud](https://docs.hetzner.cloud/).
+[![Go Report Card](https://goreportcard.com/badge/github.com/JonasProgrammer/docker-machine-driver-hetzner)](https://goreportcard.com/report/github.com/JonasProgrammer/docker-machine-driver-hetzner)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> This library adds the support for creating [Docker machines](https://github.com/docker/machine) hosted on the [Hetzner Cloud](hetzner.de/cloud). 
 
 You need to create a project-sepcific access token under `Access` > `API Tokens` in the project control panel
 and pass that to `docker-machine create` with the `--hetzner-api-token` option.
