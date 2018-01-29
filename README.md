@@ -20,7 +20,9 @@ To use the driver, you can download the sources and build it locally:
     # Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
     go get github.com/jonasprogrammer/docker-machine-driver-hetzner
 
-    # Make the binary accessible to docker-machine ($GOBIN is typically ~/go/bin)
+    # Make the binary accessible to docker-machine
+    export GOPATH=$(go env GOPATH)
+    export GOBIN=$GOPATH/bin
     export PATH="$PATH:$GOBIN"
 
     # Make docker-machine output help including hetzner-specific options
@@ -45,6 +47,8 @@ Fork this repository, yielding `github.com/<yourAccount>/docker-machine-driver-h
     #   and will hence override each other.
 
     # Make the binary accessible to docker-machine
+    export GOPATH=$(go env GOPATH)
+    export GOBIN=$GOPATH/bin
     export PATH="$PATH:$GOBIN"
 
     # Make docker-machine output help including hetzner-specific options
