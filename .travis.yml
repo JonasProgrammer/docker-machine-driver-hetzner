@@ -24,13 +24,14 @@ before_deploy:
   # they failed to build.
   - go get github.com/mitchellh/gox
   - mkdir releases
-  - gox -osarch="!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64" -output="releases/{{.Dir}}_{{.OS}}_{{.Arch}}/{{.Dir}}"
+  - gox -osarch='!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64' -output="releases/{{.Dir}}_{{.OS}}_{{.Arch}}/{{.Dir}}"
   - find releases -maxdepth 1 -mindepth 1 -type d -exec tar -cvzf {}.tar.gz {} \;
 
 deploy:
   provider: releases
   api_key:
     secure: "axqqN9jR04SeVkHJXLRFPGECdXWcryMMgQXtN5G5vBXyN4jaEl0L6uMxxRxO/v+XQc71lS3YR+6vgpqYgK5PSEORi8EDzGaiEzZN2Zg1YKX1vCP+n5FykKu+v/+j+S/ZCNI+gvW4hhgb4vFXzcy3OF/CKSKlzfIM9Gqx8VtHQ+C3EQPkW1xgpVoGmenU505DipDJHQkE99WTtUmV34hQagOcDDEUMotCEn653YOeuPMUpprmfpwthAtZbKNls//+TUWboYzLkqQlym0vuSnDVXCIxTjAtakAIhnPQfynh6DGVkQhdVSPD8epo1o36/K4DQrf49Mj+yIZxhJ9o27XPHPdnsnpslrZZl0ayQw4GHGwMq4eRUGxW/fLE64sCO18JZMd5qtU9K/z9cAcS480uZI0yzD94xROcvMeBxxGyt/aQU0oqnu/3b7QPzU0DR824gmBgtVCBkrg58pTMKHn5U+BosZjBjMMWcj8WAzVuJt7P81gMIzc7m7cpU2NWf5Z3RgBFgD4EfZrmCnlENzgMyXkWkqJYpVGOBB/DblTLp4t8v8T07QCBcD2oWd/dLvc816Ot0FXyIttQEhpEMRlYBpUSBjR5Nov8hYQdFebKUB+nDJoC+L73okf2BdST4v/LCN86bNregHL1DxRNB84vlSeMM2bC31DuiD0Z+dX7VI="
+  file_glob: true # enables wildcards in file names
   file: "releases/*tar.gz"
   skip_cleanup: true
   on:
