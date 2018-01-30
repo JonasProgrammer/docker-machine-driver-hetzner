@@ -24,8 +24,7 @@ before_deploy:
   # they failed to build.
   - go get github.com/mitchellh/gox
   - mkdir releases
-  - gox -osarch="!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64" \
-	-output="releases/{{.Dir}}_{{.OS}}_{{.Arch}}/{{.Dir}}"
+  - gox -osarch="!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64" -output="releases/{{.Dir}}_{{.OS}}_{{.Arch}}/{{.Dir}}"
   - find releases -maxdepth 1 -mindepth 1 -type d -exec tar -cvzf {}.tar.gz {} \;
 
 deploy:
