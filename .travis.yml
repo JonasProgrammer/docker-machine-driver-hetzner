@@ -1,3 +1,15 @@
 language: go
 go:
   - 1.9
+before_deploy:
+  - go get github.com/mitchellh/gox
+  - mkdir releases
+  - gox -output="releases/{{.Dir}}_{{.OS}}_{{.Arch}}/{{.Dir}}"
+  - find releases -maxdepth 1 -mindepth 1 -type d -exec tar -cvzf {}.tar.gz {} \;
+deploy:
+  provider: releases
+  api_key: "CHANGE_IT"
+  file: "releases/*tar.gz"
+  skip_cleanup: true
+  on:
+    tags: true
