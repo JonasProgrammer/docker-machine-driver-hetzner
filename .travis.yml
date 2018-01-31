@@ -24,7 +24,7 @@ before_deploy:
   - go get github.com/mitchellh/gox
   - mkdir releases
   - gox -osarch="!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64" -output="releases/{{.Dir}}_`git describe --tags --abbrev=0`_{{.OS}}_{{.Arch}}/{{.Dir}}"
-  - find releases -maxdepth 1 -mindepth 1 -type d -exec tar -cvzf {}.tar.gz -C {} . \;
+  - find releases -maxdepth 1 -mindepth 1 -type d -exec tar -cvzf {}.tar.gz -C {} docker-machine-driver-hetzner \;
 
 deploy:
   # See https://docs.travis-ci.com/user/deployment/releases/
