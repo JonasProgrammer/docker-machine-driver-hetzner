@@ -129,7 +129,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 func (d *Driver) PreCreateCheck() error {
 	if d.IsExistingKey {
 		if d.originalKey == "" {
-			return errors.New("specifing an existing key ID requires the existing key path to be set as well")
+			return errors.New("specifying an existing key ID requires the existing key path to be set as well")
 		}
 
 		key, err := d.getKey()
