@@ -1,13 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"os"
-
 	"io/ioutil"
-
 	"net"
-
+	"os"
 	"time"
 
 	"github.com/docker/machine/libmachine/drivers"
@@ -16,10 +14,9 @@ import (
 	"github.com/docker/machine/libmachine/mcnutils"
 	mcnssh "github.com/docker/machine/libmachine/ssh"
 	"github.com/docker/machine/libmachine/state"
-	"golang.org/x/crypto/ssh"
-
-	"context"
 	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
 )
 
 type Driver struct {
@@ -45,11 +42,11 @@ const (
 	defaultImage = "debian-9"
 	defaultType  = "cx11"
 
-	flagApiToken  = "hetzner-api-token"
+	flagAPIToken  = "hetzner-api-token"
 	flagImage     = "hetzner-image"
 	flagType      = "hetzner-server-type"
 	flagLocation  = "hetzner-server-location"
-	flagExKeyId   = "hetzner-existing-key-id"
+	flagExKeyID   = "hetzner-existing-key-id"
 	flagExKeyPath = "hetzner-existing-key-path"
 )
 
@@ -74,39 +71,34 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	return []mcnflag.Flag{
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_API_TOKEN",
-			Name:   flagApiToken,
+			Name:   flagAPIToken,
 			Usage:  "Project-specific Hetzner API token",
 			Value:  "",
 		},
-
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_IMAGE",
 			Name:   flagImage,
 			Usage:  "Image to use for server creation",
 			Value:  defaultImage,
 		},
-
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_TYPE",
 			Name:   flagType,
 			Usage:  "Server type to create",
 			Value:  defaultType,
 		},
-
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_LOCATION",
 			Name:   flagLocation,
 			Usage:  "Location to create machine at",
 			Value:  "",
 		},
-
 		mcnflag.IntFlag{
 			EnvVar: "HETZNER_EXISTING_KEY_ID",
-			Name:   flagExKeyId,
+			Name:   flagExKeyID,
 			Usage:  "Existing key ID to use for server; requires --hetzner-existing-key-path",
 			Value:  0,
 		},
-
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_EXISTING_KEY_PATH",
 			Name:   flagExKeyPath,
@@ -117,18 +109,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 }
 
 func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
-	d.AccessToken = opts.String(flagApiToken)
+	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
 	d.Location = opts.String(flagLocation)
 	d.Type = opts.String(flagType)
-	d.KeyID = opts.Int(flagExKeyId)
+	d.KeyID = opts.Int(flagExKeyID)
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 
 	d.SetSwarmConfigFromFlags(opts)
 
 	if d.AccessToken == "" {
-		return fmt.Errorf("hetzner requires --%v to be set", flagApiToken)
+		return errors.Errorf("hetzner requires --%v to be set", flagAPIToken)
 	}
 
 	return nil
@@ -137,42 +129,41 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 func (d *Driver) PreCreateCheck() error {
 	if d.IsExistingKey {
 		if d.originalKey == "" {
-			return fmt.Errorf("specifing an existing key ID requires the existing key path to be set as well")
+			return errors.New("specifing an existing key ID requires the existing key path to be set as well")
 		}
 
 		key, err := d.getKey()
-
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not get key")
 		}
 
 		buf, err := ioutil.ReadFile(d.originalKey + ".pub")
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not read public key")
 		}
 
 		// Will also parse `ssh-rsa w309jwf0e39jf asdf` public keys
 		pubk, _, _, _, err := ssh.ParseAuthorizedKey(buf)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not parse authorized key")
 		}
 
 		if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
 			key.Fingerprint != ssh.FingerprintSHA256(pubk) {
-			return fmt.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
+			return errors.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
 		}
 	}
 
 	if _, err := d.getType(); err != nil {
-		return err
+		return errors.Wrap(err, "could not get type")
 	}
 
 	if _, err := d.getImage(); err != nil {
-		return err
+		return errors.Wrap(err, "could not get image")
 	}
 
 	if _, err := d.getLocation(); err != nil {
-		return err
+		return errors.Wrap(err, "could not get location")
 	}
 
 	return nil
@@ -182,12 +173,12 @@ func (d *Driver) Create() error {
 	if d.originalKey != "" {
 		log.Debugf("Copying SSH key...")
 		if err := d.copySSHKeyPair(d.originalKey); err != nil {
-			return err
+			return errors.Wrap(err, "could not copy ssh key pair")
 		}
 	} else {
 		log.Debugf("Generating SSH key...")
 		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-			return err
+			return errors.Wrap(err, "could not generate ssh key")
 		}
 	}
 
@@ -196,7 +187,7 @@ func (d *Driver) Create() error {
 
 		buf, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not read ssh public key")
 		}
 
 		keyopts := hcloud.SSHKeyCreateOpts{
@@ -205,9 +196,8 @@ func (d *Driver) Create() error {
 		}
 
 		key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
-
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not create ssh key")
 		}
 
 		d.KeyID = key.ID
@@ -222,30 +212,28 @@ func (d *Driver) Create() error {
 
 	var err error
 	if srvopts.Location, err = d.getLocation(); err != nil {
-		return err
+		return errors.Wrap(err, "could not get location")
 	}
 	if srvopts.ServerType, err = d.getType(); err != nil {
-		return err
+		return errors.Wrap(err, "could not get type")
 	}
 	if srvopts.Image, err = d.getImage(); err != nil {
-		return err
+		return errors.Wrap(err, "could not get image")
 	}
-	if key, err := d.getKey(); err == nil {
-		srvopts.SSHKeys = append(srvopts.SSHKeys, key)
-	} else {
-		return err
+	key, err := d.getKey()
+	if err != nil {
+		return errors.Wrap(err, "could not get ssh key")
 	}
+	srvopts.SSHKeys = append(srvopts.SSHKeys, key)
 
 	srv, _, err := d.getClient().Server.Create(context.Background(), srvopts)
-
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not create server")
 	}
 
 	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Server.Name, srv.Server.ID, srv.Action.Command, srv.Action.ID)
-
 	if err = d.waitForAction(srv.Action); err != nil {
-		return err
+		return errors.Wrap(err, "could not wait for action")
 	}
 
 	d.ServerID = srv.Server.ID
@@ -253,9 +241,8 @@ func (d *Driver) Create() error {
 
 	for {
 		srvstate, err := d.GetState()
-
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not get state")
 		}
 
 		if srvstate == state.Running {
@@ -276,17 +263,15 @@ func (d *Driver) Create() error {
 func (d *Driver) destroyDanglingKey() {
 	if d.danglingKey && !d.IsExistingKey && d.KeyID != 0 {
 		key, err := d.getKey()
-
 		if err != nil {
-			log.Error(err)
+			log.Errorf("could not get key: %v", err)
 			return
 		}
 
 		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
-			log.Error(err)
+			log.Errorf("could not delete ssh key: %v", err)
 			return
 		}
-
 		d.KeyID = 0
 	}
 }
@@ -297,12 +282,12 @@ func (d *Driver) GetSSHHostname() (string, error) {
 
 func (d *Driver) GetURL() (string, error) {
 	if err := drivers.MustBeRunning(d); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "could not execute drivers.MustBeRunning")
 	}
 
 	ip, err := d.GetIP()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "could not get IP")
 	}
 
 	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, "2376")), nil
@@ -310,9 +295,8 @@ func (d *Driver) GetURL() (string, error) {
 
 func (d *Driver) GetState() (state.State, error) {
 	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
-
 	if err != nil {
-		return state.None, err
+		return state.None, errors.Wrap(err, "could not get server by ID")
 	}
 
 	switch srv.Status {
@@ -329,29 +313,27 @@ func (d *Driver) GetState() (state.State, error) {
 func (d *Driver) Remove() error {
 	if d.ServerID != 0 {
 		srv, err := d.getServerHandle()
-
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not get server handle")
 		}
 
 		log.Infof(" -> Destroying server %s[%d] in...", srv.Name, srv.ID)
 
 		if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
-			return err
+			return errors.Wrap(err, "could not delete server")
 		}
 	}
 
 	if !d.IsExistingKey && d.KeyID != 0 {
 		key, err := d.getKey()
-
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not get ssh key")
 		}
 
 		log.Infof(" -> Destroying SSHKey %s[%d]...", key.Name, key.ID)
 
 		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
-			return err
+			return errors.Wrap(err, "could not delete ssh key")
 		}
 	}
 
@@ -360,10 +342,13 @@ func (d *Driver) Remove() error {
 
 func (d *Driver) Restart() error {
 	srv, err := d.getServerHandle()
+	if err != nil {
+		return errors.Wrap(err, "could not get server handle")
+	}
 
 	act, _, err := d.getClient().Server.Reboot(context.Background(), srv)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not reboot server")
 	}
 
 	log.Infof(" -> Rebooting server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -373,10 +358,13 @@ func (d *Driver) Restart() error {
 
 func (d *Driver) Start() error {
 	srv, err := d.getServerHandle()
+	if err != nil {
+		return errors.Wrap(err, "could not get server handle")
+	}
 
 	act, _, err := d.getClient().Server.Poweron(context.Background(), srv)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not power on server")
 	}
 
 	log.Infof(" -> Starting server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -386,10 +374,13 @@ func (d *Driver) Start() error {
 
 func (d *Driver) Stop() error {
 	srv, err := d.getServerHandle()
+	if err != nil {
+		return errors.Wrap(err, "could not get server handle")
+	}
 
 	act, _, err := d.getClient().Server.Shutdown(context.Background(), srv)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not shutdown server")
 	}
 
 	log.Infof(" -> Shutting down server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -399,10 +390,13 @@ func (d *Driver) Stop() error {
 
 func (d *Driver) Kill() error {
 	srv, err := d.getServerHandle()
+	if err != nil {
+		return errors.Wrap(err, "could not get server handle")
+	}
 
 	act, _, err := d.getClient().Server.Poweroff(context.Background(), srv)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not poweroff server")
 	}
 
 	log.Infof(" -> Powering off server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -416,15 +410,15 @@ func (d *Driver) getClient() *hcloud.Client {
 
 func (d *Driver) copySSHKeyPair(src string) error {
 	if err := mcnutils.CopyFile(src, d.GetSSHKeyPath()); err != nil {
-		return fmt.Errorf("unable to copy ssh key: %s", err)
+		return errors.Wrap(err, "could not copy ssh key")
 	}
 
 	if err := mcnutils.CopyFile(src+".pub", d.GetSSHKeyPath()+".pub"); err != nil {
-		return fmt.Errorf("unable to copy ssh public key: %s", err)
+		return errors.Wrap(err, "could not copy ssh public key")
 	}
 
 	if err := os.Chmod(d.GetSSHKeyPath(), 0600); err != nil {
-		return fmt.Errorf("unable to set permissions on the ssh key: %s", err)
+		return errors.Wrap(err, "could not set permissions on the ssh key")
 	}
 
 	return nil
@@ -436,12 +430,11 @@ func (d *Driver) getLocation() (*hcloud.Location, error) {
 	}
 
 	location, _, err := d.getClient().Location.GetByName(context.Background(), d.Location)
-
-	if err == nil {
-		d.cachedLocation = location
+	if err != nil {
+		return location, errors.Wrap(err, "could not get location by name")
 	}
-
-	return location, err
+	d.cachedLocation = location
+	return location, nil
 }
 
 func (d *Driver) getType() (*hcloud.ServerType, error) {
@@ -450,12 +443,11 @@ func (d *Driver) getType() (*hcloud.ServerType, error) {
 	}
 
 	stype, _, err := d.getClient().ServerType.GetByName(context.Background(), d.Type)
-
-	if err == nil {
-		d.cachedType = stype
+	if err != nil {
+		return stype, errors.Wrap(err, "could not get type by name")
 	}
-
-	return stype, err
+	d.cachedType = stype
+	return stype, nil
 }
 
 func (d *Driver) getImage() (*hcloud.Image, error) {
@@ -464,12 +456,11 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 	}
 
 	image, _, err := d.getClient().Image.GetByName(context.Background(), d.Image)
-
-	if err == nil {
-		d.cachedImage = image
+	if err != nil {
+		return image, errors.Wrap(err, "could not get image by name")
 	}
-
-	return image, err
+	d.cachedImage = image
+	return image, nil
 }
 
 func (d *Driver) getKey() (*hcloud.SSHKey, error) {
@@ -478,12 +469,11 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 	}
 
 	stype, _, err := d.getClient().SSHKey.GetByID(context.Background(), d.KeyID)
-
-	if err == nil {
-		d.cachedKey = stype
+	if err != nil {
+		return stype, errors.Wrap(err, "could not get sshkey by ID")
 	}
-
-	return stype, err
+	d.cachedKey = stype
+	return stype, nil
 }
 
 func (d *Driver) getServerHandle() (*hcloud.Server, error) {
@@ -492,24 +482,22 @@ func (d *Driver) getServerHandle() (*hcloud.Server, error) {
 	}
 
 	if d.ServerID == 0 {
-		return nil, fmt.Errorf("server ID was 0")
+		return nil, errors.New("server ID was 0")
 	}
 
 	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
-
 	if err != nil {
 		d.cachedServer = srv
+		return nil, errors.Wrap(err, "could not get client by ID")
 	}
-
-	return srv, err
+	return srv, nil
 }
 
 func (d *Driver) waitForAction(a *hcloud.Action) error {
 	for {
 		act, _, err := d.getClient().Action.GetByID(context.Background(), a.ID)
-
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not get client by ID")
 		}
 
 		if act.Status == hcloud.ActionStatusSuccess {
@@ -523,6 +511,5 @@ func (d *Driver) waitForAction(a *hcloud.Action) error {
 
 		time.Sleep(1 * time.Second)
 	}
-
 	return nil
 }
