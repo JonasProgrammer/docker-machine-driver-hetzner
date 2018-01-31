@@ -6,27 +6,10 @@
 
 > This library adds the support for creating [Docker machines](https://github.com/docker/machine) hosted on the [Hetzner Cloud](hetzner.de/cloud). 
 
-You need to create a project-sepcific access token under `Access` > `API Tokens` in the project control panel
+You need to create a project-specific access token under `Access` > `API Tokens` in the project control panel
 and pass that to `docker-machine create` with the `--hetzner-api-token` option.
 
-## Setup
-
-### Go
-
-Use an up-to-date version of [Go](https://golang.org/dl)
-
-To use the driver, you can download the sources and build it locally:
-
-```shell
-# Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
-$ go get github.com/jonasprogrammer/docker-machine-driver-hetzner
-
-# Make the binary accessible to docker-machine
-$ export GOPATH=$(go env GOPATH)
-$ export GOBIN=$GOPATH/bin
-$ export PATH="$PATH:$GOBIN"
-```
-### Binary
+## Installation
 
 You can find sources and pre-compiled binaries [here](https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases).
 
@@ -43,22 +26,22 @@ $ cp docker-machine-driver-hetzner /usr/local/bin/
 ## Usage
 
     $ docker-machine create \
-	--driver hetzner \
-	--hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-	some-machine
+      --driver hetzner \
+      --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+      some-machine
     
 ### Using environment variables
 
     $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
       && HETZNER_IMAGE=centos-7 \
       && docker-machine create \
-	--driver hetzner \
-        some-machine
+         --driver hetzner \
+         some-machine
     
 
 ## Options
 
--   `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner CLoud API.
+-   `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
 -   `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list.
 -   `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list.
 -   `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
@@ -96,6 +79,22 @@ was used during creation.
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
 
+
+## Building from source
+
+Use an up-to-date version of [Go](https://golang.org/dl)
+
+To use the driver, you can download the sources and build it locally:
+
+```shell
+# Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
+$ go get github.com/jonasprogrammer/docker-machine-driver-hetzner
+
+# Make the binary accessible to docker-machine
+$ export GOPATH=$(go env GOPATH)
+$ export GOBIN=$GOPATH/bin
+$ export PATH="$PATH:$GOBIN"
+```
 
 ## Development
 
