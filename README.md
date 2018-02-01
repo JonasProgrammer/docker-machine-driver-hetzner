@@ -2,47 +2,46 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/JonasProgrammer/docker-machine-driver-hetzner)](https://goreportcard.com/report/github.com/JonasProgrammer/docker-machine-driver-hetzner)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://secure.travis-ci.org/JonasProgrammer/docker-machine-driver-hetzner.png)](http://travis-ci.org/JonasProgrammer/docker-machine-driver-hetzner)
 
 > This library adds the support for creating [Docker machines](https://github.com/docker/machine) hosted on the [Hetzner Cloud](hetzner.de/cloud). 
 
-You need to create a project-sepcific access token under `Access` > `API Tokens` in the project control panel
+You need to create a project-specific access token under `Access` > `API Tokens` in the project control panel
 and pass that to `docker-machine create` with the `--hetzner-api-token` option.
 
+## Installation
 
-## Building
+You can find sources and pre-compiled binaries [here](https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases).
 
-Use an up-to-date version of [go](https://golang.org/dl)
+```shell
+# Download the binary (this example downloads the binary for linux amd64)
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/0.2.4/docker-machine-driver-hetzner_0.2.4_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_0.2.4_linux_amd64.tar.gz
 
-To use the driver, you can download the sources and build it locally:
-
-    # Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
-    go get github.com/jonasprogrammer/docker-machine-driver-hetzner
-
-    # Make the binary accessible to docker-machine
-    export GOPATH=$(go env GOPATH)
-    export GOBIN=$GOPATH/bin
-    export PATH="$PATH:$GOBIN"
-
+# Make it executable and copy the binary in a directory accessible with your $PATH
+$ chmod +x docker-machine-driver-hetzner
+$ cp docker-machine-driver-hetzner /usr/local/bin/
+```
 
 ## Usage
 
     $ docker-machine create \
-	--driver hetzner \
-	--hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-	some-machine
+      --driver hetzner \
+      --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+      some-machine
     
 ### Using environment variables
 
     $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
       && HETZNER_IMAGE=centos-7 \
       && docker-machine create \
-	--driver hetzner \
-        some-machine
+         --driver hetzner \
+         some-machine
     
 
 ## Options
 
--   `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner CLoud API.
+-   `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
 -   `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list.
 -   `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list.
 -   `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
@@ -81,28 +80,46 @@ was used during creation.
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
 
 
+## Building from source
+
+Use an up-to-date version of [Go](https://golang.org/dl)
+
+To use the driver, you can download the sources and build it locally:
+
+```shell
+# Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
+$ go get github.com/jonasprogrammer/docker-machine-driver-hetzner
+
+# Make the binary accessible to docker-machine
+$ export GOPATH=$(go env GOPATH)
+$ export GOBIN=$GOPATH/bin
+$ export PATH="$PATH:$GOBIN"
+```
+
 ## Development
 
 Fork this repository, yielding `github.com/<yourAccount>/docker-machine-driver-hetzner`.
 
-    # Get the sources of your fork and build it locally
-    go get github.com/<yourAccount>/docker-machine-driver-hetzner
+```shell
+# Get the sources of your fork and build it locally
+$ go get github.com/<yourAccount>/docker-machine-driver-hetzner
 
-    # * This integrates your fork into the $GOPATH (typically pointing at ~/go)
-    # * Your sources are at $GOPATH/src/github.com/<yourAccount>/docker-machine-driver-hetzner
-    # * That folder is a local Git repository. You can pull, commit and push from there.
-    # * The binary will typically be at $GOPATH/bin/docker-machine-driver-hetzner
-    # * In the source directory $GOPATH/src/github.com/<yourAccount>/docker-machine-driver-hetzner
-    #   you may use go get to re-build the binary.
-    # * Note: when you build the driver from different repositories, e.g. from your fork
-    #   as well as github.com/jonasprogrammer/docker-machine-driver-hetzner,
-    #   the binary files generated by these builds are all called the same
-    #   and will hence override each other.
+# * This integrates your fork into the $GOPATH (typically pointing at ~/go)
+# * Your sources are at $GOPATH/src/github.com/<yourAccount>/docker-machine-driver-hetzner
+# * That folder is a local Git repository. You can pull, commit and push from there.
+# * The binary will typically be at $GOPATH/bin/docker-machine-driver-hetzner
+# * In the source directory $GOPATH/src/github.com/<yourAccount>/docker-machine-driver-hetzner
+#   you may use go get to re-build the binary.
+# * Note: when you build the driver from different repositories, e.g. from your fork
+#   as well as github.com/jonasprogrammer/docker-machine-driver-hetzner,
+#   the binary files generated by these builds are all called the same
+#   and will hence override each other.
 
-    # Make the binary accessible to docker-machine
-    export GOPATH=$(go env GOPATH)
-    export GOBIN=$GOPATH/bin
-    export PATH="$PATH:$GOBIN"
+# Make the binary accessible to docker-machine
+$ export GOPATH=$(go env GOPATH)
+$ export GOBIN=$GOPATH/bin
+$ export PATH="$PATH:$GOBIN"
 
-    # Make docker-machine output help including hetzner-specific options
-    docker-machine create --driver hetzner
+# Make docker-machine output help including hetzner-specific options
+$ docker-machine create --driver hetzner
+```
