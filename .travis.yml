@@ -14,7 +14,7 @@
 #       below the api_key
 language: go
 go:
-  - 1.9
+  - stable
 
 before_deploy:
   # Create binaries for many OSs and architures as tarballs.
