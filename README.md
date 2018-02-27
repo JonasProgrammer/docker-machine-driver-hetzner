@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```shell
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/0.2.7/docker-machine-driver-hetzner_0.2.7_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_0.2.7_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/1.0.0/docker-machine-driver-hetzner_1.0.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_1.0.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -42,16 +42,14 @@ $ cp docker-machine-driver-hetzner /usr/local/bin/
 ## Options
 
 -   `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
--   `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list.
--   `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list.
+-   `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list  (defaults to `ubuntu-16.04`).
+-   `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
 -   `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
 **NOTICE: Beware that Hetzner does not reject invalid location names at the time of writing this; instead, a seemingly random location is chosen. Double check both the option value's
 spelling and the newly created server to make sure the desired location was chosen indeed.**
 -   `--hetzner-existing-key-path`: Use an existing (local) SSH key instead of generating a new keypair.
 -   `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
     see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
-
-The Hetzner Cloud driver will use `debian-9` as the default image and `cx11` as the default type.
 
 #### Existing SSH keys
 
