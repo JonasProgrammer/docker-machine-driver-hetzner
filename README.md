@@ -71,7 +71,7 @@ was used during creation.
 | CLI option                          | Environment variable              | Default                    |
 | ----------------------------------- | --------------------------------- | -------------------------- |
 | **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               | -                          |
-| `--hetzner-image `                  | `HETZNER_IMAGE_IMAGE`             | `debian-9`                 |
+| `--hetzner-image `                  | `HETZNER_IMAGE_IMAGE`             | `ubuntu-16.04`             |
 | `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
 | `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
