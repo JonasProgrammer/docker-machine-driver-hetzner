@@ -35,6 +35,7 @@ type Driver struct {
 	originalKey    string
 	danglingKey    bool
 	ServerID       int
+	userData       string
 	cachedServer   *hcloud.Server
 }
 
@@ -48,6 +49,7 @@ const (
 	flagLocation  = "hetzner-server-location"
 	flagExKeyID   = "hetzner-existing-key-id"
 	flagExKeyPath = "hetzner-existing-key-path"
+	flagUserData  = "hetzner-user-data"
 )
 
 func NewDriver() *Driver {
@@ -105,6 +107,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Path to existing key (new public key will be created unless --hetzner-existing-key-id is specified)",
 			Value:  "",
 		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_USER_DATA",
+			Name:   flagUserData,
+			Usage:  "Cloud-init based User data",
+			Value:  "",
+		},
 	}
 }
 
@@ -116,13 +124,13 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.KeyID = opts.Int(flagExKeyID)
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
+	d.userData = opts.String(flagUserData)
 
 	d.SetSwarmConfigFromFlags(opts)
 
 	if d.AccessToken == "" {
 		return errors.Errorf("hetzner requires --%v to be set", flagAPIToken)
 	}
-
 	return nil
 }
 
@@ -208,7 +216,10 @@ func (d *Driver) Create() error {
 
 	log.Infof("Creating Hetzner server...")
 
-	srvopts := hcloud.ServerCreateOpts{Name: d.GetMachineName()}
+	srvopts := hcloud.ServerCreateOpts{
+		Name:     d.GetMachineName(),
+		UserData: d.userData,
+	}
 
 	var err error
 	if srvopts.Location, err = d.getLocation(); err != nil {
