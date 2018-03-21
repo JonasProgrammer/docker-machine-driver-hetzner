@@ -13,7 +13,7 @@ and pass that to `docker-machine create` with the `--hetzner-api-token` option.
 
 You can find sources and pre-compiled binaries [here](https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases).
 
-```shell
+```bash
 # Download the binary (this example downloads the binary for linux amd64)
 $ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/1.0.0/docker-machine-driver-hetzner_1.0.0_linux_amd64.tar.gz
 $ tar -xvf docker-machine-driver-hetzner_1.0.0_linux_amd64.tar.gz
@@ -25,19 +25,42 @@ $ cp docker-machine-driver-hetzner /usr/local/bin/
 
 ## Usage
 
-    $ docker-machine create \
-      --driver hetzner \
-      --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-      some-machine
-    
+```bash
+$ docker-machine create \
+  --driver hetzner \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  some-machine
+```
+
 ### Using environment variables
 
-    $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-      && HETZNER_IMAGE=centos-7 \
-      && docker-machine create \
-         --driver hetzner \
-         some-machine
-    
+```bash
+$ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  && HETZNER_IMAGE=centos-7 \
+  && docker-machine create \
+     --driver hetzner \
+     some-machine
+```   
+
+### Using Cloud-init
+
+```bash
+$ CLOUD_INIT_USER_DATA=`cat <<EOF
+#cloud-config
+write_files:
+  - path: /test.txt
+    content: |
+      Here is a line.
+      Another line is here.
+EOF
+`
+
+$ docker-machine create \
+  --driver hetzner \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  --hetzner-user-data="${CLOUD_INIT_USER_DATA}" \
+  some-machine
+```
 
 ## Options
 
