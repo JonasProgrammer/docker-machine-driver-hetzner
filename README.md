@@ -13,7 +13,7 @@ and pass that to `docker-machine create` with the `--hetzner-api-token` option.
 
 You can find sources and pre-compiled binaries [here](https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases).
 
-```shell
+```bash
 # Download the binary (this example downloads the binary for linux amd64)
 $ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/1.0.0/docker-machine-driver-hetzner_1.0.0_linux_amd64.tar.gz
 $ tar -xvf docker-machine-driver-hetzner_1.0.0_linux_amd64.tar.gz
@@ -25,31 +25,55 @@ $ cp docker-machine-driver-hetzner /usr/local/bin/
 
 ## Usage
 
-    $ docker-machine create \
-      --driver hetzner \
-      --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-      some-machine
-    
+```bash
+$ docker-machine create \
+  --driver hetzner \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  some-machine
+```
+
 ### Using environment variables
 
-    $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-      && HETZNER_IMAGE=centos-7 \
-      && docker-machine create \
-         --driver hetzner \
-         some-machine
-    
+```bash
+$ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  && HETZNER_IMAGE=centos-7 \
+  && docker-machine create \
+     --driver hetzner \
+     some-machine
+```   
+
+### Using Cloud-init
+
+```bash
+$ CLOUD_INIT_USER_DATA=`cat <<EOF
+#cloud-config
+write_files:
+  - path: /test.txt
+    content: |
+      Here is a line.
+      Another line is here.
+EOF
+`
+
+$ docker-machine create \
+  --driver hetzner \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  --hetzner-user-data="${CLOUD_INIT_USER_DATA}" \
+  some-machine
+```
 
 ## Options
 
--   `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
--   `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list  (defaults to `ubuntu-16.04`).
--   `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
--   `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
+- `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
+- `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list  (defaults to `ubuntu-16.04`).
+- `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
+- `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
 **NOTICE: Beware that Hetzner does not reject invalid location names at the time of writing this; instead, a seemingly random location is chosen. Double check both the option value's
 spelling and the newly created server to make sure the desired location was chosen indeed.**
--   `--hetzner-existing-key-path`: Use an existing (local) SSH key instead of generating a new keypair.
--   `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
-    see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
+- `--hetzner-existing-key-path`: Use an existing (local) SSH key instead of generating a new keypair.
+- `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
+  see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
+- `--hetzner-user-data`: Cloud-init based User data
 
 #### Existing SSH keys
 
@@ -76,6 +100,7 @@ was used during creation.
 | `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
+| `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
 
 
 ## Building from source
