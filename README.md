@@ -42,6 +42,21 @@ $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI5
      some-machine
 ```   
 
+### Dealing with kernels without aufs
+
+If you use an image without aufs, like the one currently supplied with the
+debian-9 image, you can try specifying another storage driver, such as
+overlay2. Like so:
+
+```bash
+$ docker-machine create \
+  --engine-storage-driver overlay2
+  --driver hetzner \
+  --hetzner-image debian-9 \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  some-machine
+```
+
 ### Using Cloud-init
 
 ```bash
