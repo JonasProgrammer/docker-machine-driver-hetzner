@@ -77,10 +77,22 @@ $ docker-machine create \
   some-machine
 ```
 
+### Using a snapshot
+
+Assuming your snapshot ID is `424242`:
+```bash
+$ docker-machine create \
+  --driver hetzner \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  --hetzner-image-id=424242 \
+  some-machine
+```
+
 ## Options
 
 - `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
-- `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list  (defaults to `ubuntu-16.04`).
+- `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (defaults to `ubuntu-16.04`).
+- `--hetzner-image-id`: The id of the Hetzner cloud image (or snapshot) to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (mutually excludes `--hetzner-image`).
 - `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
 - `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
 **NOTICE: Beware that Hetzner does not reject invalid location names at the time of writing this; instead, a seemingly random location is chosen. Double check both the option value's
@@ -110,7 +122,8 @@ was used during creation.
 | CLI option                          | Environment variable              | Default                    |
 | ----------------------------------- | --------------------------------- | -------------------------- |
 | **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               | -                          |
-| `--hetzner-image `                  | `HETZNER_IMAGE_IMAGE`             | `ubuntu-16.04`             |
+| `--hetzner-image`                   | `HETZNER_IMAGE_IMAGE`             | `ubuntu-16.04`             |
+| `--hetzner-image-id`                | `HETZNER_IMAGE_IMAGE_ID`          | -                          |
 | `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
 | `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |

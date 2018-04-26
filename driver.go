@@ -24,6 +24,7 @@ type Driver struct {
 
 	AccessToken    string
 	Image          string
+	ImageID        int
 	cachedImage    *hcloud.Image
 	Type           string
 	cachedType     *hcloud.ServerType
@@ -45,6 +46,7 @@ const (
 
 	flagAPIToken  = "hetzner-api-token"
 	flagImage     = "hetzner-image"
+	flagImageID   = "hetzner-image-id"
 	flagType      = "hetzner-server-type"
 	flagLocation  = "hetzner-server-location"
 	flagExKeyID   = "hetzner-existing-key-id"
@@ -83,6 +85,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Image to use for server creation",
 			Value:  defaultImage,
 		},
+		mcnflag.IntFlag{
+			EnvVar: "HETZNER_IMAGE_ID",
+			Name:   flagImageID,
+			Usage:  "Image to use for server creation",
+		},
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_TYPE",
 			Name:   flagType,
@@ -119,6 +126,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
+	d.ImageID = opts.Int(flagImageID)
 	d.Location = opts.String(flagLocation)
 	d.Type = opts.String(flagType)
 	d.KeyID = opts.Int(flagExKeyID)
@@ -131,6 +139,11 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	if d.AccessToken == "" {
 		return errors.Errorf("hetzner requires --%v to be set", flagAPIToken)
 	}
+
+	if d.ImageID != 0 && d.Image != defaultImage {
+		return errors.Errorf("--%v and --%v are mutually exclusive", flagImage, flagImageID)
+	}
+
 	return nil
 }
 
@@ -466,10 +479,21 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 		return d.cachedImage, nil
 	}
 
-	image, _, err := d.getClient().Image.GetByName(context.Background(), d.Image)
-	if err != nil {
-		return image, errors.Wrap(err, "could not get image by name")
+	var image *hcloud.Image
+	var err error
+
+	if d.ImageID != 0 {
+		image, _, err = d.getClient().Image.GetByID(context.Background(), d.ImageID)
+		if err != nil {
+			return image, errors.Wrap(err, fmt.Sprintf("could not get image by id %v", d.ImageID))
+		}
+	} else {
+		image, _, err = d.getClient().Image.GetByName(context.Background(), d.Image)
+		if err != nil {
+			return image, errors.Wrap(err, fmt.Sprintf("could not get image by name %v", d.Image))
+		}
 	}
+
 	d.cachedImage = image
 	return image, nil
 }
