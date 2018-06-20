@@ -133,7 +133,7 @@ was used during creation.
 
 ## Building from source
 
-Use an up-to-date version of [Go](https://golang.org/dl)
+Use an up-to-date version of [Go](https://golang.org/dl) and [dep](https://github.com/golang/dep)
 
 To use the driver, you can download the sources and build it locally:
 
@@ -145,6 +145,10 @@ $ go get github.com/jonasprogrammer/docker-machine-driver-hetzner
 $ export GOPATH=$(go env GOPATH)
 $ export GOBIN=$GOPATH/bin
 $ export PATH="$PATH:$GOBIN"
+$ cd $GOPATH/src/jonasprogrammer/docker-machine-driver-hetzner
+$ dep ensure
+$ go build -o docker-machine-driver-hetzner
+$ cp docker-machine-driver-hetzner /usr/local/bin/docker-machine-driver-hetzner
 ```
 
 ## Development
