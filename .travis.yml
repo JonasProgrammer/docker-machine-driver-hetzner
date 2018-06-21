@@ -16,6 +16,16 @@ language: go
 go:
   - stable
 
+env:
+  - DEP_VERSION="0.4.1"
+
+before_install:
+  # Install Go Dep
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+
+install:
+  - dep ensure
+
 before_deploy:
   # Create binaries for many OSs and architures as tarballs.
   # the -osarch="!a/b !c/d" option is used to exclude OS-arch pairs
