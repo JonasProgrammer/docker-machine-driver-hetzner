@@ -16,9 +16,6 @@ language: go
 go:
   - stable
 
-env:
-  - DEP_VERSION="0.4.1"
-
 before_install:
   # Install Go Dep
   - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
