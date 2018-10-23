@@ -522,9 +522,10 @@ func (d *Driver) getServerHandle() (*hcloud.Server, error) {
 
 	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
 	if err != nil {
-		d.cachedServer = srv
 		return nil, errors.Wrap(err, "could not get client by ID")
 	}
+
+	d.cachedServer = srv
 	return srv, nil
 }
 
