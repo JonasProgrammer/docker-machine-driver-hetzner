@@ -341,10 +341,14 @@ func (d *Driver) Remove() error {
 			return errors.Wrap(err, "could not get server handle")
 		}
 
-		log.Infof(" -> Destroying server %s[%d] in...", srv.Name, srv.ID)
+		if srv == nil {
+			log.Infof(" -> Server does not exist anymore")
+		} else {
+			log.Infof(" -> Destroying server %s[%d] in...", srv.Name, srv.ID)
 
-		if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
-			return errors.Wrap(err, "could not delete server")
+			if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
+				return errors.Wrap(err, "could not delete server")
+			}
 		}
 	}
 
