@@ -3,23 +3,28 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:6da51e5ec493ad2b44cb04129e2d0a068c8fb9bd6cb5739d199573558696bb94"
   name = "github.com/Azure/go-ansiterm"
   packages = [
     ".",
-    "winterm"
+    "winterm",
   ]
+  pruneopts = "UT"
   revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
 
 [[projects]]
   branch = "master"
+  digest = "1:9857dce653aab290cef50f602aec3d75c6877877cbd1b163e8814465e9718771"
   name = "github.com/docker/docker"
   packages = [
     "pkg/term",
-    "pkg/term/windows"
+    "pkg/term/windows",
   ]
-  revision = "e2593239d949eee454935daea7a5fe025477322f"
+  pruneopts = "UT"
+  revision = "f7e5154f37a45dc2e576abbef404f3032e9823bf"
 
 [[projects]]
+  digest = "1:e763ac6333e3c4ee5eca4ff85bee97f58b3ffc723ac58e81d273c8f5cc6a6567"
   name = "github.com/docker/machine"
   packages = [
     "libmachine/drivers",
@@ -32,34 +37,50 @@
     "libmachine/ssh",
     "libmachine/state",
     "libmachine/version",
-    "version"
+    "version",
   ]
+  pruneopts = "UT"
   revision = "b48dc28d9139c93d166f07d8b3a049b59bceef9c"
   version = "v0.15.0"
 
 [[projects]]
+  digest = "1:a06b1208e37cdc6825e52b80e3d5f4b86d9b1b536c97b5b396e1e0063358a871"
   name = "github.com/hetznercloud/hcloud-go"
   packages = [
     "hcloud",
-    "hcloud/schema"
+    "hcloud/schema",
   ]
-  revision = "f4c8a4379a2c0a24e9c4fc242be72b9110e1426d"
-  version = "v1.7.0"
+  pruneopts = "UT"
+  revision = "2798131998b49288e9da4ecef6e38f3d665fcbb2"
+  version = "v1.10.0"
 
 [[projects]]
+  digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
+  pruneopts = "UT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:3f53e9e4dfbb664cd62940c9c4b65a2171c66acd0b7621a1a6b8e78513525a52"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
-  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
-  version = "v1.0.5"
+  pruneopts = "UT"
+  revision = "ad15b42461921f1fb3529b058c6786c6a45d5162"
+  version = "v1.1.1"
 
 [[projects]]
   branch = "master"
+  digest = "1:a1a1abedfdfaeac675547fbf03a213f558c111575785d5d57616b697fdb1caf3"
   name = "golang.org/x/crypto"
   packages = [
     "curve25519",
@@ -69,22 +90,36 @@
     "internal/subtle",
     "poly1305",
     "ssh",
-    "ssh/terminal"
+    "ssh/terminal",
   ]
-  revision = "7f39a6fea4fe9364fb61e1def6a268a51b4f3a06"
+  pruneopts = "UT"
+  revision = "0c41d7ab0a0ee717d4590a44bcb987dfd9e183eb"
 
 [[projects]]
   branch = "master"
+  digest = "1:899c684138eb2844811b7f97e264d3c65d533dbedc59549fa58fc2bf316f83a1"
   name = "golang.org/x/sys"
   packages = [
     "unix",
-    "windows"
+    "windows",
   ]
-  revision = "fc8bd948cf46f9c7af0f07d34151ce25fe90e477"
+  pruneopts = "UT"
+  revision = "44b849a8bc13eb42e95e6c6c5e360481b73ec710"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6e814739f702baed8e2a248403682785b2a3de37ee636d7392b1cec0b0832ef3"
+  input-imports = [
+    "github.com/docker/machine/libmachine/drivers",
+    "github.com/docker/machine/libmachine/drivers/plugin",
+    "github.com/docker/machine/libmachine/log",
+    "github.com/docker/machine/libmachine/mcnflag",
+    "github.com/docker/machine/libmachine/mcnutils",
+    "github.com/docker/machine/libmachine/ssh",
+    "github.com/docker/machine/libmachine/state",
+    "github.com/hetznercloud/hcloud-go/hcloud",
+    "github.com/pkg/errors",
+    "golang.org/x/crypto/ssh",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
