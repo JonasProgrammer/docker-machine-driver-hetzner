@@ -322,6 +322,9 @@ func (d *Driver) GetState() (state.State, error) {
 	if err != nil {
 		return state.None, errors.Wrap(err, "could not get server by ID")
 	}
+	if srv == nil {
+		return state.None, errors.New("server not found")
+	}
 
 	switch srv.Status {
 	case hcloud.ServerStatusInitializing:
@@ -357,6 +360,10 @@ func (d *Driver) Remove() error {
 		if err != nil {
 			return errors.Wrap(err, "could not get ssh key")
 		}
+		if key == nil {
+			log.Infof(" -> SSH key does not exist anymore")
+			return nil
+		}
 
 		log.Infof(" -> Destroying SSHKey %s[%d]...", key.Name, key.ID)
 
@@ -372,6 +379,9 @@ func (d *Driver) Restart() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
+	}
+	if srv == nil {
+		return errors.New("server not found")
 	}
 
 	act, _, err := d.getClient().Server.Reboot(context.Background(), srv)
@@ -389,6 +399,9 @@ func (d *Driver) Start() error {
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
 	}
+	if srv == nil {
+		return errors.New("server not found")
+	}
 
 	act, _, err := d.getClient().Server.Poweron(context.Background(), srv)
 	if err != nil {
@@ -405,6 +418,9 @@ func (d *Driver) Stop() error {
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
 	}
+	if srv == nil {
+		return errors.New("server not found")
+	}
 
 	act, _, err := d.getClient().Server.Shutdown(context.Background(), srv)
 	if err != nil {
@@ -420,6 +436,9 @@ func (d *Driver) Kill() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
+	}
+	if srv == nil {
+		return errors.New("server not found")
 	}
 
 	act, _, err := d.getClient().Server.Poweroff(context.Background(), srv)
