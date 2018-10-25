@@ -30,7 +30,7 @@ before_deploy:
   # they failed to build.
   - go get github.com/mitchellh/gox
   - mkdir releases
-  - gox -osarch='!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64' -output="releases/{{.Dir}}_`git describe --tags --abbrev=0`_{{.OS}}_{{.Arch}}/{{.Dir}}"
+  - gox -osarch='!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64' -output="releases/{{.Dir}}_`git describe --tags --abbrev=0`_{{.OS}}_{{.Arch}}/{{.Dir}}" -ldflags "-X main.Version=`git describe --tags --abbrev=0`"
   # Loop through the built architecture directories and create their corresponding tar.gz archives with the binary in it.
   - find releases -maxdepth 2 -mindepth 2 -type f -exec bash -c 'tar -cvzf "$(dirname {}).tar.gz" -C "$(dirname {})" $(basename {})' \;
 
