@@ -57,7 +57,7 @@ $ docker-machine create \
   some-machine
 ```
 
-Of you can use this workaround to add aufs to debian9 images
+Or you can use this workaround and add aufs to debian9:
 
 ```bash
 # please note starting docker inside the machine fails when starting - this is ugly but ok
