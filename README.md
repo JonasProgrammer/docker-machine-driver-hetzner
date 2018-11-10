@@ -50,11 +50,28 @@ overlay2. Like so:
 
 ```bash
 $ docker-machine create \
-  --engine-storage-driver overlay2
+  --engine-storage-driver overlay2 \
   --driver hetzner \
   --hetzner-image debian-9 \
   --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
   some-machine
+```
+
+Of you can use this workaround to add aufs to debian9 images
+
+```bash
+# please note starting docker inside the machine fails when starting - this is ugly but ok
+$ docker-machine create \
+  --engine-storage-driver aufs \
+  --driver hetzner \
+  --hetzner-image debian-9 \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  some-machine
+  
+# we will now add the aufs and restart docker
+$ docker-machine ssh some-machine 'apt-get install aufs-dkms linux-headers-$(uname -r) -y -qq && \
+  modprobe aufs && \
+  service docker restart'
 ```
 
 ### Using Cloud-init
