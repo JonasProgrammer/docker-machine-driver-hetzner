@@ -25,6 +25,9 @@ $ cp docker-machine-driver-hetzner /usr/local/bin/
 
 ## Usage
 
+If the commands shown in this section do not work as expected, check the *Known Issues* section
+at the end of this file.
+
 ```bash
 $ docker-machine create \
   --driver hetzner \
@@ -41,38 +44,6 @@ $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI5
      --driver hetzner \
      some-machine
 ```   
-
-### Dealing with kernels without aufs
-
-If you use an image without aufs, like the one currently supplied with the
-debian-9 image, you can try specifying another storage driver, such as
-overlay2. Like so:
-
-```bash
-$ docker-machine create \
-  --engine-storage-driver overlay2 \
-  --driver hetzner \
-  --hetzner-image debian-9 \
-  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-  some-machine
-```
-
-Or you can use this workaround and add aufs to debian9:
-
-```bash
-# please note starting docker inside the machine fails when starting - this is ugly but ok
-$ docker-machine create \
-  --engine-storage-driver aufs \
-  --driver hetzner \
-  --hetzner-image debian-9 \
-  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
-  some-machine
-  
-# we will now add the aufs and restart docker
-$ docker-machine ssh some-machine 'apt-get install aufs-dkms linux-headers-$(uname -r) -y -qq && \
-  modprobe aufs && \
-  service docker restart'
-```
 
 ### Using Cloud-init
 
@@ -195,3 +166,46 @@ $ export PATH="$PATH:$GOBIN"
 # Make docker-machine output help including hetzner-specific options
 $ docker-machine create --driver hetzner
 ```
+
+## Known problems
+
+### Dealing with kernels without aufs
+
+**Please beware this section is outdated for current versions of `docker` and `docker-machine`.
+Modern `docker` versions will likely auto-detect the best storage driver for the given
+circumstances. Try upgrading `docker` and `docker-machine` first, if you are running into this
+problem. This section is kept for information purpose and when you are in an environment, where
+you cannot upgrade tools easily.**
+
+If you use an image without aufs, like the one currently supplied with the
+debian-9 image, you can try specifying another storage driver, such as
+overlay2.
+
+```bash
+$ docker-machine create \
+  --engine-storage-driver overlay2 \
+  --driver hetzner \
+  --hetzner-image debian-9 \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  some-machine
+```
+
+Or you can use this workaround and add aufs to debian9:
+
+```bash
+# please note starting docker inside the machine fails when starting - this is ugly but ok
+$ docker-machine create \
+  --engine-storage-driver aufs \
+  --driver hetzner \
+  --hetzner-image debian-9 \
+  --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
+  some-machine
+  
+# we will now add the aufs and restart docker
+$ docker-machine ssh some-machine 'apt-get install aufs-dkms linux-headers-$(uname -r) -y -qq && \
+  modprobe aufs && \
+  service docker restart'
+```
+
+**Beware that `overlay2` is recommended over `aufs` in current docker versions. Unless you have
+a specific reason to use `aufs`, you are likely better off with auto-detection or `overlay2`.**
