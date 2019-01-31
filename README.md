@@ -50,7 +50,7 @@ overlay2. Like so:
 
 ```bash
 $ docker-machine create \
-  --engine-storage-driver overlay2
+  --engine-storage-driver overlay2 \
   --driver hetzner \
   --hetzner-image debian-9 \
   --hetzner-api-token=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI513sy \
