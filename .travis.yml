@@ -16,10 +16,6 @@ language: go
 go:
   - stable
 
-before_install:
-  # Install Go Dep
-  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-
 install:
   - dep ensure
 
