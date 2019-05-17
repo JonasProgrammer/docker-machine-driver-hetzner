@@ -14,7 +14,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9857dce653aab290cef50f602aec3d75c6877877cbd1b163e8814465e9718771"
+  digest = "1:f1beae74e4ad389f4a6c1eaeb9539c9a0c1b7b934aee3576147b988e09184f9c"
   name = "github.com/docker/docker"
   packages = [
     "pkg/term",
@@ -44,15 +44,15 @@
   version = "v0.15.0"
 
 [[projects]]
-  digest = "1:a06b1208e37cdc6825e52b80e3d5f4b86d9b1b536c97b5b396e1e0063358a871"
+  digest = "1:11023f5bea4042c407e78c3e12266c60a05dde4c8de31281fe3d28c518fe825d"
   name = "github.com/hetznercloud/hcloud-go"
   packages = [
     "hcloud",
     "hcloud/schema",
   ]
   pruneopts = "UT"
-  revision = "2798131998b49288e9da4ecef6e38f3d665fcbb2"
-  version = "v1.10.0"
+  revision = "ecf008900c9b247d0e904c946fd092110ad07e1b"
+  version = "v1.13.0"
 
 [[projects]]
   digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"

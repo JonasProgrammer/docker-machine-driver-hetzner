@@ -452,7 +452,7 @@ func (d *Driver) Kill() error {
 }
 
 func (d *Driver) getClient() *hcloud.Client {
-	return hcloud.NewClient(hcloud.WithToken(d.AccessToken))
+	return hcloud.NewClient(hcloud.WithToken(d.AccessToken), hcloud.WithApplication("docker-machine-driver", Version))
 }
 
 func (d *Driver) copySSHKeyPair(src string) error {
