@@ -16,9 +16,6 @@ language: go
 go:
   - stable
 
-install:
-  - dep ensure
-
 before_deploy:
   # Create binaries for many OSs and architures as tarballs.
   # the -osarch="!a/b !c/d" option is used to exclude OS-arch pairs
