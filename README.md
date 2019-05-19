@@ -136,7 +136,7 @@ Use an up-to-date version of [Go](https://golang.org/dl) to use Go Modules.
 To use the driver, you can download the sources and build it locally:
 
 ```shell
-# Enable Go Modules
+# Enable Go Modules if you are not outside of your $GOPATH
 $ export GO111MODULE=on
 
 # Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
