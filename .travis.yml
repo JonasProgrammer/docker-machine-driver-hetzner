@@ -15,6 +15,9 @@
 language: go
 go:
   - stable
+env:
+  global:
+    - GO111MODULE=on
 
 before_deploy:
   # Create binaries for many OSs and architures as tarballs.
