@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://secure.travis-ci.org/JonasProgrammer/docker-machine-driver-hetzner.png)](http://travis-ci.org/JonasProgrammer/docker-machine-driver-hetzner)
 
-> This library adds the support for creating [Docker machines](https://github.com/docker/machine) hosted on the [Hetzner Cloud](https://www.hetzner.de/cloud). 
+> This library adds the support for creating [Docker machines](https://github.com/docker/machine) hosted on the [Hetzner Cloud](https://www.hetzner.de/cloud).
 
 You need to create a project-specific access token under `Access` > `API Tokens` in the project control panel
 and pass that to `docker-machine create` with the `--hetzner-api-token` option.
@@ -40,7 +40,7 @@ $ HETZNER_API_TOKEN=QJhoRT38JfAUO037PWJ5Zt9iAABIxdxdh4gPqNkUGKIrUMd6I3cPIsfKozI5
   && docker-machine create \
      --driver hetzner \
      some-machine
-```   
+```
 
 ### Dealing with kernels without aufs
 
@@ -131,11 +131,14 @@ was used during creation.
 
 ## Building from source
 
-Use an up-to-date version of [Go](https://golang.org/dl) and [dep](https://github.com/golang/dep)
+Use an up-to-date version of [Go](https://golang.org/dl) to use Go Modules.
 
 To use the driver, you can download the sources and build it locally:
 
 ```shell
+# Enable Go Modules if you are not outside of your $GOPATH
+$ export GO111MODULE=on
+
 # Get sources and build the binary at ~/go/bin/docker-machine-driver-hetzner
 $ go get github.com/jonasprogrammer/docker-machine-driver-hetzner
 
@@ -144,7 +147,6 @@ $ export GOPATH=$(go env GOPATH)
 $ export GOBIN=$GOPATH/bin
 $ export PATH="$PATH:$GOBIN"
 $ cd $GOPATH/src/jonasprogrammer/docker-machine-driver-hetzner
-$ dep ensure
 $ go build -o docker-machine-driver-hetzner
 $ cp docker-machine-driver-hetzner /usr/local/bin/docker-machine-driver-hetzner
 ```
