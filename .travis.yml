@@ -18,6 +18,7 @@ go:
 env:
   global:
     - GO111MODULE=on
+    - CGO_ENABLED=0
 
 before_deploy:
   # Create binaries for many OSs and architures as tarballs.
