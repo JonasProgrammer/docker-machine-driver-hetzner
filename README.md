@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/1.3.0/docker-machine-driver-hetzner_1.3.0_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_1.3.0_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/1.4.0/docker-machine-driver-hetzner_1.4.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_1.4.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -99,6 +99,8 @@ $ docker-machine create \
 - `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
   see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
 - `--hetzner-user-data`: Cloud-init based User data
+- `--hetzner-volumes`: Volume IDs or names which should be attached to the server
+- `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
 
 #### Existing SSH keys
 
@@ -127,6 +129,8 @@ was used during creation.
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
 | `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
+| `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
+| `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
 
 
 ## Building from source

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/docker/machine/libmachine/drivers"
@@ -128,13 +127,13 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_VOLUMES",
 			Name:   flagVolumes,
-			Usage:  "Volume IDs which should be attached to the server",
+			Usage:  "Volume IDs or names which should be attached to the server",
 			Value:  []string{},
 		},
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_NETWORKS",
 			Name:   flagNetworks,
-			Usage:  "Network IDs which should be attached to the server private network interface",
+			Usage:  "Network IDs or names which should be attached to the server private network interface",
 			Value:  []string{},
 		},
 	}
@@ -254,22 +253,20 @@ func (d *Driver) Create() error {
 	}
 	networks := []*hcloud.Network{}
 	for _, networkID := range d.networkIDs {
-		parsedNetworkID, err := strconv.Atoi(networkID)
+		network, _, err := d.getClient().Network.Get(context.Background(), networkID)
 		if err != nil {
-			return errors.Wrap(err, "could not convert network ID to int")
+			return errors.Wrap(err, "could not get network by ID or name")
 		}
-		network, _, err := d.getClient().Network.GetByID(context.Background(), parsedNetworkID)
 		networks = append(networks, network)
 	}
 	srvopts.Networks = networks
 
 	volumes := []*hcloud.Volume{}
 	for _, volumeID := range d.volumeIDs {
-		parsedVolumeID, err := strconv.Atoi(volumeID)
+		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeID)
 		if err != nil {
-			return errors.Wrap(err, "could not convert volume ID to int")
+			return errors.Wrap(err, "could not get volume by ID or name")
 		}
-		volume, _, err := d.getClient().Volume.GetByID(context.Background(), parsedVolumeID)
 		volumes = append(volumes, volume)
 	}
 	srvopts.Volumes = volumes
