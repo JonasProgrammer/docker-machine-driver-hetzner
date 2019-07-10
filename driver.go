@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/docker/machine/libmachine/drivers"
@@ -37,6 +38,8 @@ type Driver struct {
 	danglingKey    bool
 	ServerID       int
 	userData       string
+	volumeIDs      []string
+	networkIDs     []string
 	cachedServer   *hcloud.Server
 }
 
@@ -52,6 +55,8 @@ const (
 	flagExKeyID   = "hetzner-existing-key-id"
 	flagExKeyPath = "hetzner-existing-key-path"
 	flagUserData  = "hetzner-user-data"
+	flagVolumes   = "hetzner-volumes"
+	flagNetworks  = "hetzner-networks"
 )
 
 func NewDriver() *Driver {
@@ -120,6 +125,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Cloud-init based User data",
 			Value:  "",
 		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_VOLUMES",
+			Name:   flagVolumes,
+			Usage:  "Volume IDs which should be attached to the server",
+			Value:  []string{},
+		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_NETWORKS",
+			Name:   flagNetworks,
+			Usage:  "Network IDs which should be attached to the server private network interface",
+			Value:  []string{},
+		},
 	}
 }
 
@@ -133,6 +150,8 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 	d.userData = opts.String(flagUserData)
+	d.volumeIDs = opts.StringSlice(flagVolumes)
+	d.networkIDs = opts.StringSlice(flagNetworks)
 
 	d.SetSwarmConfigFromFlags(opts)
 
@@ -233,6 +252,27 @@ func (d *Driver) Create() error {
 		Name:     d.GetMachineName(),
 		UserData: d.userData,
 	}
+	networks := []*hcloud.Network{}
+	for _, networkID := range d.networkIDs {
+		parsedNetworkID, err := strconv.Atoi(networkID)
+		if err != nil {
+			return errors.Wrap(err, "could not convert network ID to int")
+		}
+		network, _, err := d.getClient().Network.GetByID(context.Background(), parsedNetworkID)
+		networks = append(networks, network)
+	}
+	srvopts.Networks = networks
+
+	volumes := []*hcloud.Volume{}
+	for _, volumeID := range d.volumeIDs {
+		parsedVolumeID, err := strconv.Atoi(volumeID)
+		if err != nil {
+			return errors.Wrap(err, "could not convert volume ID to int")
+		}
+		volume, _, err := d.getClient().Volume.GetByID(context.Background(), parsedVolumeID)
+		volumes = append(volumes, volume)
+	}
+	srvopts.Volumes = volumes
 
 	var err error
 	if srvopts.Location, err = d.getLocation(); err != nil {
