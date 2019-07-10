@@ -37,8 +37,8 @@ type Driver struct {
 	danglingKey    bool
 	ServerID       int
 	userData       string
-	volumeIDs      []string
-	networkIDs     []string
+	volumes        []string
+	networks       []string
 	cachedServer   *hcloud.Server
 }
 
@@ -149,8 +149,8 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 	d.userData = opts.String(flagUserData)
-	d.volumeIDs = opts.StringSlice(flagVolumes)
-	d.networkIDs = opts.StringSlice(flagNetworks)
+	d.volumes = opts.StringSlice(flagVolumes)
+	d.networks = opts.StringSlice(flagNetworks)
 
 	d.SetSwarmConfigFromFlags(opts)
 
@@ -252,8 +252,8 @@ func (d *Driver) Create() error {
 		UserData: d.userData,
 	}
 	networks := []*hcloud.Network{}
-	for _, networkID := range d.networkIDs {
-		network, _, err := d.getClient().Network.Get(context.Background(), networkID)
+	for _, networkIDorName := range d.networks {
+		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
 		if err != nil {
 			return errors.Wrap(err, "could not get network by ID or name")
 		}
@@ -262,8 +262,8 @@ func (d *Driver) Create() error {
 	srvopts.Networks = networks
 
 	volumes := []*hcloud.Volume{}
-	for _, volumeID := range d.volumeIDs {
-		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeID)
+	for _, volumeIDorName := range d.volumes {
+		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
 		if err != nil {
 			return errors.Wrap(err, "could not get volume by ID or name")
 		}
