@@ -37,6 +37,8 @@ type Driver struct {
 	danglingKey    bool
 	ServerID       int
 	userData       string
+	volumes        []string
+	networks       []string
 	cachedServer   *hcloud.Server
 }
 
@@ -52,6 +54,8 @@ const (
 	flagExKeyID   = "hetzner-existing-key-id"
 	flagExKeyPath = "hetzner-existing-key-path"
 	flagUserData  = "hetzner-user-data"
+	flagVolumes   = "hetzner-volumes"
+	flagNetworks  = "hetzner-networks"
 )
 
 func NewDriver() *Driver {
@@ -120,6 +124,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Cloud-init based User data",
 			Value:  "",
 		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_VOLUMES",
+			Name:   flagVolumes,
+			Usage:  "Volume IDs or names which should be attached to the server",
+			Value:  []string{},
+		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_NETWORKS",
+			Name:   flagNetworks,
+			Usage:  "Network IDs or names which should be attached to the server private network interface",
+			Value:  []string{},
+		},
 	}
 }
 
@@ -133,6 +149,8 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 	d.userData = opts.String(flagUserData)
+	d.volumes = opts.StringSlice(flagVolumes)
+	d.networks = opts.StringSlice(flagNetworks)
 
 	d.SetSwarmConfigFromFlags(opts)
 
@@ -233,6 +251,25 @@ func (d *Driver) Create() error {
 		Name:     d.GetMachineName(),
 		UserData: d.userData,
 	}
+	networks := []*hcloud.Network{}
+	for _, networkIDorName := range d.networks {
+		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
+		if err != nil {
+			return errors.Wrap(err, "could not get network by ID or name")
+		}
+		networks = append(networks, network)
+	}
+	srvopts.Networks = networks
+
+	volumes := []*hcloud.Volume{}
+	for _, volumeIDorName := range d.volumes {
+		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
+		if err != nil {
+			return errors.Wrap(err, "could not get volume by ID or name")
+		}
+		volumes = append(volumes, volume)
+	}
+	srvopts.Volumes = volumes
 
 	var err error
 	if srvopts.Location, err = d.getLocation(); err != nil {
