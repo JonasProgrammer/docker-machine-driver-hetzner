@@ -15,7 +15,7 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/2.0.0/docker-machine-driver-hetzner_2.0.1_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/2.0.1/docker-machine-driver-hetzner_2.0.1_linux_amd64.tar.gz
 $ tar -xvf docker-machine-driver-hetzner_2.0.1_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
