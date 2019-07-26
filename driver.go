@@ -258,7 +258,7 @@ func (d *Driver) Create() error {
 			return errors.Wrap(err, "could not get network by ID or name")
 		}
 		if network == nil {
-			return errors.New("network not found")
+			return errors.Errorf("network '%s' not found", networkIDorName)
 		}
 		networks = append(networks, network)
 	}
@@ -271,7 +271,7 @@ func (d *Driver) Create() error {
 			return errors.Wrap(err, "could not get volume by ID or name")
 		}
 		if volume == nil {
-			return errors.New("volume not found")
+			return errors.Errorf("volume '%s' not found", volumeIDorName)
 		}
 		volumes = append(volumes, volume)
 	}
