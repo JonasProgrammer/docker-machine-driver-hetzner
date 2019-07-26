@@ -43,7 +43,7 @@ type Driver struct {
 }
 
 const (
-	defaultImage = "ubuntu-16.04"
+	defaultImage = "ubuntu-18.04"
 	defaultType  = "cx11"
 
 	flagAPIToken  = "hetzner-api-token"
