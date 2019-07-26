@@ -122,8 +122,8 @@ was used during creation.
 | CLI option                          | Environment variable              | Default                    |
 | ----------------------------------- | --------------------------------- | -------------------------- |
 | **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               | -                          |
-| `--hetzner-image`                   | `HETZNER_IMAGE_IMAGE`             | `ubuntu-16.04`             |
-| `--hetzner-image-id`                | `HETZNER_IMAGE_IMAGE_ID`          | -                          |
+| `--hetzner-image`                   | `HETZNER_IMAGE`                   | `ubuntu-18.04`             |
+| `--hetzner-image-id`                | `HETZNER_IMAGE_ID`                | -                          |
 | `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
 | `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
