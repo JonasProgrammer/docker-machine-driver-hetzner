@@ -101,6 +101,7 @@ $ docker-machine create \
 - `--hetzner-user-data`: Cloud-init based User data
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
 - `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
+- `--hetzner-use-private-network`: Use private network
 
 #### Existing SSH keys
 
@@ -131,6 +132,7 @@ was used during creation.
 | `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
 | `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
 | `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
+| `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
 
 
 ## Building from source

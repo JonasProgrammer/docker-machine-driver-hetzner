@@ -22,40 +22,42 @@ import (
 type Driver struct {
 	*drivers.BaseDriver
 
-	AccessToken    string
-	Image          string
-	ImageID        int
-	cachedImage    *hcloud.Image
-	Type           string
-	cachedType     *hcloud.ServerType
-	Location       string
-	cachedLocation *hcloud.Location
-	KeyID          int
-	cachedKey      *hcloud.SSHKey
-	IsExistingKey  bool
-	originalKey    string
-	danglingKey    bool
-	ServerID       int
-	userData       string
-	volumes        []string
-	networks       []string
-	cachedServer   *hcloud.Server
+	AccessToken       string
+	Image             string
+	ImageID           int
+	cachedImage       *hcloud.Image
+	Type              string
+	cachedType        *hcloud.ServerType
+	Location          string
+	cachedLocation    *hcloud.Location
+	KeyID             int
+	cachedKey         *hcloud.SSHKey
+	IsExistingKey     bool
+	originalKey       string
+	danglingKey       bool
+	ServerID          int
+	userData          string
+	volumes           []string
+	networks          []string
+	UsePrivateNetwork bool
+	cachedServer      *hcloud.Server
 }
 
 const (
 	defaultImage = "ubuntu-18.04"
 	defaultType  = "cx11"
 
-	flagAPIToken  = "hetzner-api-token"
-	flagImage     = "hetzner-image"
-	flagImageID   = "hetzner-image-id"
-	flagType      = "hetzner-server-type"
-	flagLocation  = "hetzner-server-location"
-	flagExKeyID   = "hetzner-existing-key-id"
-	flagExKeyPath = "hetzner-existing-key-path"
-	flagUserData  = "hetzner-user-data"
-	flagVolumes   = "hetzner-volumes"
-	flagNetworks  = "hetzner-networks"
+	flagAPIToken          = "hetzner-api-token"
+	flagImage             = "hetzner-image"
+	flagImageID           = "hetzner-image-id"
+	flagType              = "hetzner-server-type"
+	flagLocation          = "hetzner-server-location"
+	flagExKeyID           = "hetzner-existing-key-id"
+	flagExKeyPath         = "hetzner-existing-key-path"
+	flagUserData          = "hetzner-user-data"
+	flagVolumes           = "hetzner-volumes"
+	flagNetworks          = "hetzner-networks"
+	flagUsePrivateNetwork = "hetzner-use-private-network"
 )
 
 func NewDriver() *Driver {
@@ -136,6 +138,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Network IDs or names which should be attached to the server private network interface",
 			Value:  []string{},
 		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_USE_PRIVATE_NETWORK",
+			Name:   flagUsePrivateNetwork,
+			Usage:  "Use private network",
+		},
 	}
 }
 
@@ -151,6 +158,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.userData = opts.String(flagUserData)
 	d.volumes = opts.StringSlice(flagVolumes)
 	d.networks = opts.StringSlice(flagNetworks)
+	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
 
 	d.SetSwarmConfigFromFlags(opts)
 
@@ -203,6 +211,10 @@ func (d *Driver) PreCreateCheck() error {
 
 	if _, err := d.getLocation(); err != nil {
 		return errors.Wrap(err, "could not get location")
+	}
+
+	if d.UsePrivateNetwork && len(d.networks) == 0 {
+		return errors.Errorf("No private network attached.")
 	}
 
 	return nil
@@ -319,9 +331,26 @@ func (d *Driver) Create() error {
 		time.Sleep(1 * time.Second)
 	}
 
-	log.Debugf(" -> Server %s[%d] ready", srv.Server.Name, srv.Server.ID)
-	d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
+	if d.UsePrivateNetwork {
+		for {
+			// we need to wait until network is attached
+			log.Infof("Wait until private network attached ...")
+			server, _, err := d.getClient().Server.GetByID(context.Background(), srv.Server.ID)
+			if err != nil {
+				return errors.Wrapf(err, "could not get newly created server [%d]", srv.Server.ID)
+			}
+			if server.PrivateNet != nil {
+				d.IPAddress = server.PrivateNet[0].IP.String()
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+	} else {
+		log.Infof("Using public network ...")
+		d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
+	}
 
+	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
 	d.danglingKey = false
 
 	return nil
