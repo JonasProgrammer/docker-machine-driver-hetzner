@@ -241,14 +241,29 @@ func (d *Driver) Create() error {
 			return errors.Wrap(err, "could not read ssh public key")
 		}
 
-		keyopts := hcloud.SSHKeyCreateOpts{
-			Name:      d.GetMachineName(),
-			PublicKey: string(buf),
+		// Try to find a key with the same Fingerprint
+		pubkey, _, _, _, err := ssh.ParseAuthorizedKey(buf)
+		if err != nil {
+			return errors.Wrap(err, "could not parse ssh public key")
 		}
 
-		key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
+		fp := ssh.FingerprintLegacyMD5(pubkey)
+
+		key, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
 		if err != nil {
-			return errors.Wrap(err, "could not create ssh key")
+			log.Debugf("SSH key not found in Hetzner. Uploading...")
+
+			keyopts := hcloud.SSHKeyCreateOpts{
+				Name:      d.GetMachineName(),
+				PublicKey: string(buf),
+			}
+
+			key, _, err = d.getClient().SSHKey.Create(context.Background(), keyopts)
+			if err != nil {
+				return errors.Wrap(err, "could not create ssh key")
+			}
+		} else {
+			log.Debugf("SSH key found in Hetzner. ID: %d", key.ID)
 		}
 
 		d.KeyID = key.ID
