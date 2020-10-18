@@ -241,17 +241,9 @@ func (d *Driver) Create() error {
 			return errors.Wrap(err, "could not read ssh public key")
 		}
 
-		// Try to find a key with the same Fingerprint
-		pubkey, _, _, _, err := ssh.ParseAuthorizedKey(buf)
-		if err != nil {
-			return errors.Wrap(err, "could not parse ssh public key")
-		}
-
-		fp := ssh.FingerprintLegacyMD5(pubkey)
-
-		key, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
-		if err != nil {
-			log.Debugf("SSH key not found in Hetzner. Uploading...")
+		key, err := d.getRemoteKeyWithSameFingerprint(buf)
+		if key == nil {
+			log.Infof("SSH key not found in Hetzner. Uploading...")
 
 			keyopts := hcloud.SSHKeyCreateOpts{
 				Name:      d.GetMachineName(),
@@ -619,6 +611,21 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 	}
 	d.cachedKey = stype
 	return stype, nil
+}
+
+func (d *Driver) getRemoteKeyWithSameFingerprint(pubkey_byte []byte) (*hcloud.SSHKey, error) {
+	pubkey, _, _, _, err := ssh.ParseAuthorizedKey(pubkey_byte)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not parse ssh public key")
+	}
+
+	fp := ssh.FingerprintLegacyMD5(pubkey)
+
+	remotekey, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
+	if err != nil {
+		return remotekey, errors.Wrap(err, "could not get sshkey by fingerprint")
+	}
+	return remotekey, nil
 }
 
 func (d *Driver) getServerHandle() (*hcloud.Server, error) {
