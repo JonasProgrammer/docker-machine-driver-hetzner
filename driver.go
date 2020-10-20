@@ -253,15 +253,18 @@ func (d *Driver) Create() error {
 			key, _, err = d.getClient().SSHKey.Create(context.Background(), keyopts)
 			if err != nil {
 				return errors.Wrap(err, "could not create ssh key")
+			} else if key == nil {
+				return errors.Errorf("key upload did not return an error, but key was nil")
 			}
+
+			d.danglingKey = true
+			defer d.destroyDanglingKey()
 		} else {
+			d.IsExistingKey = true
 			log.Debugf("SSH key found in Hetzner. ID: %d", key.ID)
 		}
 
 		d.KeyID = key.ID
-		d.danglingKey = true
-
-		defer d.destroyDanglingKey()
 	}
 
 	log.Infof("Creating Hetzner server...")
