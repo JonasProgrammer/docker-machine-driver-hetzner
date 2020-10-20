@@ -27,7 +27,7 @@ before_deploy:
   # they failed to build.
   - go get github.com/mitchellh/gox
   - mkdir releases
-  - gox -osarch='!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64' -output="releases/{{.Dir}}_`git describe --tags --abbrev=0`_{{.OS}}_{{.Arch}}/{{.Dir}}" -ldflags "-X main.Version=`git describe --tags --abbrev=0`"
+  - gox -osarch='!netbsd/arm !openbsd/386 !openbsd/amd64 !netbsd/386 !netbsd/amd64 !darwin/386' -output="releases/{{.Dir}}_`git describe --tags --abbrev=0`_{{.OS}}_{{.Arch}}/{{.Dir}}" -ldflags "-X main.Version=`git describe --tags --abbrev=0`"
   # Loop through the built architecture directories and create their corresponding tar.gz archives with the binary in it.
   - find releases -maxdepth 2 -mindepth 2 -type f -exec bash -c 'tar -cvzf "$(dirname {}).tar.gz" -C "$(dirname {})" $(basename {})' \;
 
@@ -35,7 +35,7 @@ deploy:
   # See https://docs.travis-ci.com/user/deployment/releases/
   provider: releases
   api_key:
-    secure: "iP4OADhPOZm3xDPkjO6PhNHGGC+iNAEhwIe/weZ2LgegkxThc2KwiWTB/rkjLVOV4NV/zg37ScIADCJCpvKSsSlQs+f6kWc1y2Hf7VLmFy5enu8Q/EcnbS268RwlpwVi3JR01kWRWVTiQn0ia77mw++gVWv93cfEnLoyy1TptyrcuaBDNibVulH6MN5nZFwI/DhKCLoDARcIPO1cC9f0maf1jJ+hhM4kqSnWt201TT+GOsovuTg0eGZeUDRZRlizj25CoQyy9GffyMq9v7AOWoujj4VK269dDSC41XlHr/qE6Czs1CGnTrV7RaIhN2UQMRJsQlRA1vMpzVNxDst5ZuBx3N+KbVtRlGrRTsty5U87fVP/VQYI+ot21KG2ycTjm44xDKozw574WwXdsEj3A7PVMHnjL5QpOVL9je2O6kqrEyr2WOgWkxalQZS1QthNyrHnQFxupA4IeV6hvPakFAAMofiMwCcHrmMeXR8HJ3CzWtDHuI2bwubIOGlueNaSs9ws1XFK333RCfvZEojGPG4pjf/cCtqL/Hguq4/XS2BxTCm6m1c2SqBdW5XOAX9YELQCNixmlD2XLrgivnTTkmcuVfFcoG1XNrrWZBVK3Jz2g4LwDb1Aje/ENlgtAK7pIiMt6FOhRZNMyBU1xEI2WoaUStaWhfZoKolK5w4yuq4="
+    secure: "Hnpq64pZL+CFaaqjQfxdAHWK3Hk+9F6CgzjaIo3K9puNAySsA1XVQHsqCV4P9v6hE5o3TjgQJZwpqLN/h53JPeZ1xwybj6sVyWwzQzNr99QGJH6Pr7g3mgVIIHyzy+4VqQ9Kw9PoNZEnq3y7wupNCjI+vN6WYWT9+gpMr4CsMyn3KEnpGREGgg964wMrBTdYoQxgNGLJtAkYwnHdYyVQaEA/9KZZUFhU8JwF0RzkBcXwgOzt9UhR9R7WgA+N2yLDFjlhmRtyTYsd2/4PX2FcsoEdUAAQBMBgw1fzBaIbUuhpT2/iNhQGs+ln/DHFPb5mUzG+JKDPEfdAAcT+h4tmIeND8gmKIspMAKsqXXZxkmi4PjobLE+rG0cUkMmnP879+ECB0buH4L8Aaxae0dMeURLxxfWhr7ytR4P93uC8KcSXrzXkx1BgqT6BasTxrxvdQQJUOCYtdWKV3w+ZsVi9YSvIoQTEL7Hy0F120mWTLYDtqtGr+VjdptUAwIi/ft8vniRimTV582Ry3v2gIstt9Wauyou8O+SA85wqpxCFJZNWX/2z8PhpHF02658ZLWpycHfwRjILwHl1c6THIyA56IZffj+8Y0yntbsFBm5nnrgGaStH/ln/N/ykWy80QzZlLfSZ2AkBC0m1qctebixmE4ekR+rF/z1mCIcRhrTaErM="
   file_glob: true # enables wildcards in file names
   file: "releases/*.tar.gz"
   skip_cleanup: true
