@@ -41,6 +41,8 @@ type Driver struct {
 	networks          []string
 	UsePrivateNetwork bool
 	cachedServer      *hcloud.Server
+	ForcePublicSSH    bool
+	PublicIPAddress   string
 }
 
 const (
@@ -58,6 +60,7 @@ const (
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
+	flagForcePublicSSH    = "hetzner-force-public-ssh"
 )
 
 func NewDriver() *Driver {
@@ -143,6 +146,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flagUsePrivateNetwork,
 			Usage:  "Use private network",
 		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_FORCE_PUBLIC_SSH",
+			Name:   flagForcePublicSSH,
+			Usage:  "Force using the public IP address for SSH connections from the outside even when the private network is enabled",
+		},
 	}
 }
 
@@ -159,6 +167,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.volumes = opts.StringSlice(flagVolumes)
 	d.networks = opts.StringSlice(flagNetworks)
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
+	d.ForcePublicSSH = opts.Bool(flagForcePublicSSH)
 
 	d.SetSwarmConfigFromFlags(opts)
 
@@ -360,6 +369,8 @@ func (d *Driver) Create() error {
 		d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
 	}
 
+	d.PublicIPAddress = srv.Server.PublicNet.IPv4.IP.String()
+
 	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
 	d.danglingKey = false
 
@@ -383,7 +394,11 @@ func (d *Driver) destroyDanglingKey() {
 }
 
 func (d *Driver) GetSSHHostname() (string, error) {
-	return d.GetIP()
+	if d.ForcePublicSSH {
+		return d.PublicIPAddress, nil
+	} else {
+		return d.GetIP()
+	}
 }
 
 func (d *Driver) GetURL() (string, error) {

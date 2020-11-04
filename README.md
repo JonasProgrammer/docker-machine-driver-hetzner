@@ -102,6 +102,7 @@ $ docker-machine create \
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
 - `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
 - `--hetzner-use-private-network`: Use private network
+- `--hetzner-force-public-ssh`: Use public IP address for SSH connections even when the private network is enabled
 
 #### Existing SSH keys
 
@@ -133,6 +134,7 @@ was used during creation.
 | `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
 | `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
 | `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
+| `--hetzner-force-public-ssh`        | `HETZNER_FORCE_PUBLIC_SSH`        | false                      |
 
 
 ## Building from source
