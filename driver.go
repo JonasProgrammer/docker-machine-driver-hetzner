@@ -34,13 +34,17 @@ type Driver struct {
 	cachedKey         *hcloud.SSHKey
 	IsExistingKey     bool
 	originalKey       string
-	danglingKey       bool
+	danglingKeys      []*hcloud.SSHKey
 	ServerID          int
 	userData          string
 	volumes           []string
 	networks          []string
 	UsePrivateNetwork bool
 	cachedServer      *hcloud.Server
+
+	additionalKeys       []string
+	AdditionalKeyIDs     []int
+	cachedAdditionalKeys []*hcloud.SSHKey
 }
 
 const (
@@ -58,6 +62,7 @@ const (
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
+	flagAdditionalKeys    = "hetzner-additional-key"
 )
 
 func NewDriver() *Driver {
@@ -65,7 +70,7 @@ func NewDriver() *Driver {
 		Image:         defaultImage,
 		Type:          defaultType,
 		IsExistingKey: false,
-		danglingKey:   false,
+		danglingKeys:  []*hcloud.SSHKey{},
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser: drivers.DefaultSSHUser,
 			SSHPort: drivers.DefaultSSHPort,
@@ -143,6 +148,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flagUsePrivateNetwork,
 			Usage:  "Use private network",
 		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_ADDITIONAL_KEYS",
+			Name:   flagAdditionalKeys,
+			Usage:  "Additional public keys to be attached to the server",
+			Value:  []string{},
+		},
 	}
 }
 
@@ -159,6 +170,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.volumes = opts.StringSlice(flagVolumes)
 	d.networks = opts.StringSlice(flagNetworks)
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
+	d.additionalKeys = opts.StringSlice(flagAdditionalKeys)
 
 	d.SetSwarmConfigFromFlags(opts)
 
@@ -233,6 +245,7 @@ func (d *Driver) Create() error {
 		}
 	}
 
+	defer d.destroyDanglingKeys()
 	if d.KeyID == 0 {
 		log.Infof("Creating SSH key...")
 
@@ -242,29 +255,43 @@ func (d *Driver) Create() error {
 		}
 
 		key, err := d.getRemoteKeyWithSameFingerprint(buf)
+		if err != nil {
+			return errors.Wrap(err, "error retrieving potentially existing key")
+		}
 		if key == nil {
 			log.Infof("SSH key not found in Hetzner. Uploading...")
 
-			keyopts := hcloud.SSHKeyCreateOpts{
-				Name:      d.GetMachineName(),
-				PublicKey: string(buf),
-			}
-
-			key, _, err = d.getClient().SSHKey.Create(context.Background(), keyopts)
+			key, err = d.makeKey(d.GetMachineName(), string(buf))
 			if err != nil {
-				return errors.Wrap(err, "could not create ssh key")
-			} else if key == nil {
-				return errors.Errorf("key upload did not return an error, but key was nil")
+				return err
 			}
-
-			d.danglingKey = true
-			defer d.destroyDanglingKey()
 		} else {
 			d.IsExistingKey = true
 			log.Debugf("SSH key found in Hetzner. ID: %d", key.ID)
 		}
 
 		d.KeyID = key.ID
+	}
+	for i, pubkey := range d.additionalKeys {
+		key, err := d.getRemoteKeyWithSameFingerprint([]byte(pubkey))
+		if err != nil {
+			return errors.Wrapf(err, "error checking for existing key for %v", pubkey)
+		}
+		if key == nil {
+			log.Infof("Creating new key for %v...", pubkey)
+			key, err = d.makeKey(fmt.Sprintf("%v-additional-%d", d.GetMachineName(), i), pubkey)
+
+			if err != nil {
+				return errors.Wrapf(err, "error creating new key for %v", pubkey)
+			}
+
+			log.Infof(" -> Created %v", key.ID)
+			d.AdditionalKeyIDs = append(d.AdditionalKeyIDs, key.ID)
+		} else {
+			log.Infof("Using existing key (%v) %v", key.ID, key.Name)
+		}
+
+		d.cachedAdditionalKeys = append(d.cachedAdditionalKeys, key)
 	}
 
 	log.Infof("Creating Hetzner server...")
@@ -313,7 +340,7 @@ func (d *Driver) Create() error {
 	if err != nil {
 		return errors.Wrap(err, "could not get ssh key")
 	}
-	srvopts.SSHKeys = append(srvopts.SSHKeys, key)
+	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
 
 	srv, _, err := d.getClient().Server.Create(context.Background(), srvopts)
 	if err != nil {
@@ -361,24 +388,40 @@ func (d *Driver) Create() error {
 	}
 
 	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
-	d.danglingKey = false
+	// Successful creation, so no keys dangle anymore
+	d.danglingKeys = nil
 
 	return nil
 }
 
-func (d *Driver) destroyDanglingKey() {
-	if d.danglingKey && !d.IsExistingKey && d.KeyID != 0 {
-		key, err := d.getKey()
-		if err != nil {
-			log.Errorf("could not get key: %v", err)
-			return
-		}
+// Creates a new key for the machine and appends it to the dangling key list
+func (d *Driver) makeKey(name string, pubkey string) (*hcloud.SSHKey, error) {
+	keyopts := hcloud.SSHKeyCreateOpts{
+		Name:      name,
+		PublicKey: pubkey,
+	}
 
+	key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create ssh key")
+	} else if key == nil {
+		return nil, errors.Errorf("key upload did not return an error, but key was nil")
+	}
+
+	d.danglingKeys = append(d.danglingKeys, key)
+	return key, nil
+}
+
+func (d *Driver) destroyDanglingKeys() {
+	if !d.IsExistingKey {
+		d.KeyID = 0
+	}
+
+	for _, key := range d.danglingKeys {
 		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
 			log.Errorf("could not delete ssh key: %v", err)
 			return
 		}
-		d.KeyID = 0
 	}
 }
 
@@ -434,6 +477,22 @@ func (d *Driver) Remove() error {
 			if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
 				return errors.Wrap(err, "could not delete server")
 			}
+		}
+	}
+
+	// Failing to remove these is just a soft error
+	for i, id := range d.AdditionalKeyIDs {
+		log.Infof(" -> Destroying additional key #%d (%d)", i, id)
+		key, _, err := d.getClient().SSHKey.GetByID(context.Background(), id)
+		if err != nil {
+			log.Warnf(" ->  -> could not retrieve key %v", err)
+		} else if key == nil {
+			log.Warnf(" ->  -> %d no longer exists", id)
+		}
+
+		_, err = d.getClient().SSHKey.Delete(context.Background(), key)
+		if err != nil {
+			log.Warnf(" ->  -> could not remove key: %v", err)
 		}
 	}
 
