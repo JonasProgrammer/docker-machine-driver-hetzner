@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.0.0/docker-machine-driver-hetzner_3.0.0_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.0.0_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.1.0/docker-machine-driver-hetzner_3.1.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_3.1.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -98,6 +98,7 @@ $ docker-machine create \
 - `--hetzner-existing-key-path`: Use an existing (local) SSH key instead of generating a new keypair. If a remote key with a matching fingerprint exists, it will be used as if specified using `--hetzner-existing-key-id`, rather than uploading a new key.
 - `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
   see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
+- `--hetzner-additional-key`: Upload an additional public key associated with the server, or associate an existing one with the same fingerprint. Can be specified multiple times.
 - `--hetzner-user-data`: Cloud-init based User data
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
 - `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
@@ -129,6 +130,7 @@ was used during creation.
 | `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
 | `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
+| `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         | -                          |
 | `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
 | `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
 | `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
