@@ -413,10 +413,6 @@ func (d *Driver) makeKey(name string, pubkey string) (*hcloud.SSHKey, error) {
 }
 
 func (d *Driver) destroyDanglingKeys() {
-	if !d.IsExistingKey {
-		d.KeyID = 0
-	}
-
 	for _, key := range d.danglingKeys {
 		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
 			log.Errorf("could not delete ssh key: %v", err)
