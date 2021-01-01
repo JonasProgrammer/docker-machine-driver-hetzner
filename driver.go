@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/machine/libmachine/drivers"
@@ -41,6 +42,7 @@ type Driver struct {
 	networks          []string
 	UsePrivateNetwork bool
 	cachedServer      *hcloud.Server
+	serverLabels      map[string]string
 
 	additionalKeys       []string
 	AdditionalKeyIDs     []int
@@ -63,6 +65,7 @@ const (
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
 	flagAdditionalKeys    = "hetzner-additional-key"
+	flagServerLabel       = "hetzner-server-label"
 )
 
 func NewDriver() *Driver {
@@ -154,6 +157,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Additional public keys to be attached to the server",
 			Value:  []string{},
 		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_SERVER_LABELS",
+			Name:   flagServerLabel,
+			Usage:  "Key value pairs of additional labels to assign to the server",
+			Value:  []string{},
+		},
 	}
 }
 
@@ -172,6 +181,11 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
 	d.additionalKeys = opts.StringSlice(flagAdditionalKeys)
 
+	err := d.setLabelsFromFlags(opts)
+	if err != nil {
+		return err
+	}
+
 	d.SetSwarmConfigFromFlags(opts)
 
 	if d.AccessToken == "" {
@@ -182,6 +196,18 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 		return errors.Errorf("--%v and --%v are mutually exclusive", flagImage, flagImageID)
 	}
 
+	return nil
+}
+
+func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
+	d.serverLabels = make(map[string]string)
+	for _, label := range opts.StringSlice(flagServerLabel) {
+		split := strings.SplitN(label, "=", 2)
+		if len(split) != 2 {
+			return errors.Errorf("server label %v is not in key=value format", label)
+		}
+		d.serverLabels[split[0]] = split[1]
+	}
 	return nil
 }
 
@@ -299,6 +325,7 @@ func (d *Driver) Create() error {
 	srvopts := hcloud.ServerCreateOpts{
 		Name:     d.GetMachineName(),
 		UserData: d.userData,
+		Labels:   d.serverLabels,
 	}
 	networks := []*hcloud.Network{}
 	for _, networkIDorName := range d.networks {
