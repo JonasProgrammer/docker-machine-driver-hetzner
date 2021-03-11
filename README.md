@@ -103,6 +103,7 @@ $ docker-machine create \
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
 - `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
 - `--hetzner-use-private-network`: Use private network
+- `--hetzner-firewalls`: Firewall IDs or names which should be applied on the server
 - `--hetzner-server-label`: `key=value` pairs of additional metadata to assign to the server.
 
 #### Existing SSH keys
@@ -134,6 +135,7 @@ was used during creation.
 | `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         | -                          |
 | `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
 | `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
+| `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               | -                          |
 | `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
 | `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
 | `--hetzner-server-label`            | `HETZNER_SERVER_LABELS`           | `[]`                       |

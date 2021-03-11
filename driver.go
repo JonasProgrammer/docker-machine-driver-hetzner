@@ -41,6 +41,7 @@ type Driver struct {
 	volumes           []string
 	networks          []string
 	UsePrivateNetwork bool
+	firewalls         []string
 	cachedServer      *hcloud.Server
 	serverLabels      map[string]string
 
@@ -64,6 +65,7 @@ const (
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
+	flagFirewalls         = "hetzner-firewalls"
 	flagAdditionalKeys    = "hetzner-additional-key"
 	flagServerLabel       = "hetzner-server-label"
 )
@@ -152,6 +154,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Use private network",
 		},
 		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_FIREWALLS",
+			Name:   flagFirewalls,
+			Usage:  "Firewall IDs or names which should be applied on the server",
+			Value:  []string{},
+		},
+		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_ADDITIONAL_KEYS",
 			Name:   flagAdditionalKeys,
 			Usage:  "Additional public keys to be attached to the server",
@@ -179,6 +187,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.volumes = opts.StringSlice(flagVolumes)
 	d.networks = opts.StringSlice(flagNetworks)
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
+	d.firewalls = opts.StringSlice(flagFirewalls)
 	d.additionalKeys = opts.StringSlice(flagAdditionalKeys)
 
 	err := d.setLabelsFromFlags(opts)
@@ -327,6 +336,7 @@ func (d *Driver) Create() error {
 		UserData: d.userData,
 		Labels:   d.serverLabels,
 	}
+
 	networks := []*hcloud.Network{}
 	for _, networkIDorName := range d.networks {
 		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
@@ -339,6 +349,19 @@ func (d *Driver) Create() error {
 		networks = append(networks, network)
 	}
 	srvopts.Networks = networks
+
+	firewalls := []*hcloud.ServerCreateFirewall{}
+	for _, firewallIDorName := range d.firewalls {
+		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
+		if err != nil {
+			return errors.Wrap(err, "could not get firewall by ID or name")
+		}
+		if firewall == nil {
+			return errors.Errorf("firewall '%s' not found", firewallIDorName)
+		}
+		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
+	}
+	srvopts.Firewalls = firewalls
 
 	volumes := []*hcloud.Volume{}
 	for _, volumeIDorName := range d.volumes {
