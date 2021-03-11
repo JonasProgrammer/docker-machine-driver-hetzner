@@ -25,9 +25,10 @@ jobs:
       run: go build -v ./...
   release:
     runs-on: ubuntu-20.04
-    needs: [lint, build]
+#    needs: [lint, build]
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+    - uses: actions/checkout@v2
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v2
       with:
