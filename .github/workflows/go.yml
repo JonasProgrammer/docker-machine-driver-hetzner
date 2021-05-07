@@ -1,10 +1,11 @@
 name: Go-CI
 on:
   push:
-    branches: [ '**' ]
+    branches: [ master ]
     tags: [ '**' ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
 jobs:
   lint:
     name: lint
@@ -35,4 +36,5 @@ jobs:
           version: latest
           args: release --rm-dist
         env:
+          CGO_ENABLED: "0"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
