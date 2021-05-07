@@ -36,5 +36,4 @@ jobs:
           version: latest
           args: release --rm-dist
         env:
-          CGO_ENABLED: "0"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
