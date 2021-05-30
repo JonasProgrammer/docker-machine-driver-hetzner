@@ -37,15 +37,15 @@ type Driver struct {
 	originalKey       string
 	danglingKeys      []*hcloud.SSHKey
 	ServerID          int
-	userData          string
-	volumes           []string
-	networks          []string
-	UsePrivateNetwork bool
-	firewalls         []string
 	cachedServer      *hcloud.Server
-	serverLabels      map[string]string
+	userData          string
+	Volumes           []string
+	Networks          []string
+	UsePrivateNetwork bool
+	Firewalls         []string
+	ServerLabels      map[string]string
 
-	additionalKeys       []string
+	AdditionalKeys       []string
 	AdditionalKeyIDs     []int
 	cachedAdditionalKeys []*hcloud.SSHKey
 }
@@ -184,11 +184,11 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 	d.userData = opts.String(flagUserData)
-	d.volumes = opts.StringSlice(flagVolumes)
-	d.networks = opts.StringSlice(flagNetworks)
+	d.Volumes = opts.StringSlice(flagVolumes)
+	d.Networks = opts.StringSlice(flagNetworks)
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
-	d.firewalls = opts.StringSlice(flagFirewalls)
-	d.additionalKeys = opts.StringSlice(flagAdditionalKeys)
+	d.Firewalls = opts.StringSlice(flagFirewalls)
+	d.AdditionalKeys = opts.StringSlice(flagAdditionalKeys)
 
 	err := d.setLabelsFromFlags(opts)
 	if err != nil {
@@ -209,13 +209,13 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 }
 
 func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
-	d.serverLabels = make(map[string]string)
+	d.ServerLabels = make(map[string]string)
 	for _, label := range opts.StringSlice(flagServerLabel) {
 		split := strings.SplitN(label, "=", 2)
 		if len(split) != 2 {
 			return errors.Errorf("server label %v is not in key=value format", label)
 		}
-		d.serverLabels[split[0]] = split[1]
+		d.ServerLabels[split[0]] = split[1]
 	}
 	return nil
 }
@@ -260,7 +260,7 @@ func (d *Driver) PreCreateCheck() error {
 		return errors.Wrap(err, "could not get location")
 	}
 
-	if d.UsePrivateNetwork && len(d.networks) == 0 {
+	if d.UsePrivateNetwork && len(d.Networks) == 0 {
 		return errors.Errorf("No private network attached.")
 	}
 
@@ -307,7 +307,7 @@ func (d *Driver) Create() error {
 
 		d.KeyID = key.ID
 	}
-	for i, pubkey := range d.additionalKeys {
+	for i, pubkey := range d.AdditionalKeys {
 		key, err := d.getRemoteKeyWithSameFingerprint([]byte(pubkey))
 		if err != nil {
 			return errors.Wrapf(err, "error checking for existing key for %v", pubkey)
@@ -334,11 +334,11 @@ func (d *Driver) Create() error {
 	srvopts := hcloud.ServerCreateOpts{
 		Name:     d.GetMachineName(),
 		UserData: d.userData,
-		Labels:   d.serverLabels,
+		Labels:   d.ServerLabels,
 	}
 
 	networks := []*hcloud.Network{}
-	for _, networkIDorName := range d.networks {
+	for _, networkIDorName := range d.Networks {
 		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
 		if err != nil {
 			return errors.Wrap(err, "could not get network by ID or name")
@@ -351,7 +351,7 @@ func (d *Driver) Create() error {
 	srvopts.Networks = networks
 
 	firewalls := []*hcloud.ServerCreateFirewall{}
-	for _, firewallIDorName := range d.firewalls {
+	for _, firewallIDorName := range d.Firewalls {
 		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
 		if err != nil {
 			return errors.Wrap(err, "could not get firewall by ID or name")
@@ -364,7 +364,7 @@ func (d *Driver) Create() error {
 	srvopts.Firewalls = firewalls
 
 	volumes := []*hcloud.Volume{}
-	for _, volumeIDorName := range d.volumes {
+	for _, volumeIDorName := range d.Volumes {
 		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
 		if err != nil {
 			return errors.Wrap(err, "could not get volume by ID or name")

@@ -5,17 +5,10 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/docker/docker v0.0.0-20181018193557-f7e5154f37a4 h1:u7P9ul4ElF92ZjxTwdWBgrXAMWXCLLfgceq4hdAMcE4=
 github.com/docker/docker v0.0.0-20181018193557-f7e5154f37a4/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
-github.com/docker/machine v0.16.1 h1:zrgroZounGVkxLmBqMyc1uT2GgapXVjIWHCfBf0udrA=
-github.com/docker/machine v0.16.1/go.mod h1:I8mPNDeK1uH+JTcUU7X0ZW8KiYz0jyAgNaeSJ1rCfDI=
 github.com/docker/machine v0.16.2 h1:jyF9k3Zg+oIGxxSdYKPScyj3HqFZ6FjgA/3sblcASiU=
 github.com/docker/machine v0.16.2/go.mod h1:I8mPNDeK1uH+JTcUU7X0ZW8KiYz0jyAgNaeSJ1rCfDI=
-github.com/google/go-cmp v0.3.0 h1:crn/baboCvb5fXaQ0IJ1SGTsTVrWpDsCWC8EGETZijY=
-github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
+github.com/google/go-cmp v0.5.2 h1:X2ev0eStA3AbceY54o37/0PQ/UWqKEiiO2dKL5OPaFM=
 github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
-github.com/hetznercloud/hcloud-go v1.14.0 h1:6IdF0Vox/6j1pyEdUCbFPIzEH/K9xZZzVuSFro8Y2vw=
-github.com/hetznercloud/hcloud-go v1.14.0/go.mod h1:8lR3yHBHZWy2uGcUi9Ibt4UOoop2wrVdERJgCtxsF3Q=
-github.com/hetznercloud/hcloud-go v1.17.0 h1:IKH0GLLoTEfgMuBY+GaaVTwjYChecrHFVo4/t0sIkGU=
-github.com/hetznercloud/hcloud-go v1.17.0/go.mod h1:8lR3yHBHZWy2uGcUi9Ibt4UOoop2wrVdERJgCtxsF3Q=
 github.com/hetznercloud/hcloud-go v1.24.0 h1:/CeHDzhH3Fhm83pjxvE3xNNLbvACl0Lu1/auJ83gG5U=
 github.com/hetznercloud/hcloud-go v1.24.0/go.mod h1:3YmyK8yaZZ48syie6xpm3dt26rtB6s65AisBHylXYFA=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
@@ -44,6 +37,7 @@ golang.org/x/sys v0.0.0-20190422165155-953cdadca894/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb h1:fgwFCsaw9buMuxNd6+DQfAuSFqbNiQZpcgJQAgJsK6k=
 golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 gotest.tools v2.2.0+incompatible h1:VsBPFP1AI068pPrMxtb/S8Zkgf9xEmTLJjfM+P5UIEo=
 gotest.tools v2.2.0+incompatible/go.mod h1:DsYFclhRJ6vuDpmuTbkuFWG+y2sxOXAzmJt81HFBacw=
