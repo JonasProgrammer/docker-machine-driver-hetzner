@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// Driver contains hetzner-specific data to implement [drivers.Driver]
 type Driver struct {
 	*drivers.BaseDriver
 
@@ -70,6 +71,7 @@ const (
 	flagServerLabel       = "hetzner-server-label"
 )
 
+// NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
 func NewDriver() *Driver {
 	return &Driver{
 		Image:         defaultImage,
@@ -83,10 +85,12 @@ func NewDriver() *Driver {
 	}
 }
 
+// DriverName returns the hard-coded string "hetzner"; see [drivers.Driver.DriverName]
 func (d *Driver) DriverName() string {
 	return "hetzner"
 }
 
+// GetCreateFlags retrieves additional driver-specific arguments; see [drivers.Driver.GetCreateFlags]
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	return []mcnflag.Flag{
 		mcnflag.StringFlag{
@@ -174,6 +178,8 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	}
 }
 
+// SetConfigFromFlags handles additional driver arguments as retrieved by [Driver.GetCreateFlags];
+// see [drivers.Driver.SetConfigFromFlags]
 func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
@@ -220,6 +226,7 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 	return nil
 }
 
+// PreCreateCheck validates the Driver data is in a valid state for creation; see [drivers.Driver.PreCreateCheck]
 func (d *Driver) PreCreateCheck() error {
 	if d.IsExistingKey {
 		if d.originalKey == "" {
@@ -267,6 +274,7 @@ func (d *Driver) PreCreateCheck() error {
 	return nil
 }
 
+// Create actually creates the hetzner-cloud server; see [drivers.Driver.Create]
 func (d *Driver) Create() error {
 	if d.originalKey != "" {
 		log.Debugf("Copying SSH key...")
@@ -471,10 +479,12 @@ func (d *Driver) destroyDanglingKeys() {
 	}
 }
 
+// GetSSHHostname retrieves the SSH host to connect to the machine; see [drivers.Driver.GetSSHHostname]
 func (d *Driver) GetSSHHostname() (string, error) {
 	return d.GetIP()
 }
 
+// GetURL retrieves the URL of the docker daemon on the machine; see [drivers.Driver.GetURL]
 func (d *Driver) GetURL() (string, error) {
 	if err := drivers.MustBeRunning(d); err != nil {
 		return "", errors.Wrap(err, "could not execute drivers.MustBeRunning")
@@ -488,6 +498,7 @@ func (d *Driver) GetURL() (string, error) {
 	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, "2376")), nil
 }
 
+// GetState retrieves the state the machine is currently in; see [drivers.Driver.GetState]
 func (d *Driver) GetState() (state.State, error) {
 	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
 	if err != nil {
@@ -508,6 +519,7 @@ func (d *Driver) GetState() (state.State, error) {
 	return state.None, nil
 }
 
+// Remove deletes the hetzner server and additional resources created during creation; see [drivers.Driver.Remove]
 func (d *Driver) Remove() error {
 	if d.ServerID != 0 {
 		srv, err := d.getServerHandle()
@@ -562,6 +574,7 @@ func (d *Driver) Remove() error {
 	return nil
 }
 
+// Restart instructs the hetzner cloud server to reboot; see [drivers.Driver.Restart]
 func (d *Driver) Restart() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -581,6 +594,7 @@ func (d *Driver) Restart() error {
 	return d.waitForAction(act)
 }
 
+// Start instructs the hetzner cloud server to power up; see [drivers.Driver.Start]
 func (d *Driver) Start() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -600,6 +614,7 @@ func (d *Driver) Start() error {
 	return d.waitForAction(act)
 }
 
+// Stop instructs the hetzner cloud server to shut down; see [drivers.Driver.Stop]
 func (d *Driver) Stop() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -619,6 +634,7 @@ func (d *Driver) Stop() error {
 	return d.waitForAction(act)
 }
 
+// Kill forcefully shuts down the hetzner cloud server; see [drivers.Driver.Kill]
 func (d *Driver) Kill() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
