@@ -276,19 +276,180 @@ func (d *Driver) PreCreateCheck() error {
 
 // Create actually creates the hetzner-cloud server; see [drivers.Driver.Create]
 func (d *Driver) Create() error {
-	if d.originalKey != "" {
-		log.Debugf("Copying SSH key...")
-		if err := d.copySSHKeyPair(d.originalKey); err != nil {
-			return errors.Wrap(err, "could not copy ssh key pair")
-		}
-	} else {
-		log.Debugf("Generating SSH key...")
-		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-			return errors.Wrap(err, "could not generate ssh key")
-		}
+	err := d.prepareLocalKey()
+	if err != nil {
+		return err
 	}
 
 	defer d.destroyDanglingKeys()
+	err = d.createRemoteKeys()
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Creating Hetzner server...")
+
+	srvopts, err := d.makeCreateServerOptions()
+	if err != nil {
+		return err
+	}
+
+	srv, _, err := d.getClient().Server.Create(context.Background(), *srvopts)
+	if err != nil {
+		return errors.Wrap(err, "could not create server")
+	}
+
+	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Server.Name, srv.Server.ID, srv.Action.Command, srv.Action.ID)
+	if err = d.waitForAction(srv.Action); err != nil {
+		return errors.Wrap(err, "could not wait for action")
+	}
+
+	d.ServerID = srv.Server.ID
+	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Server.Name, srv.Server.ID)
+
+	err = d.waitForRunningServer()
+	if err != nil {
+		return err
+	}
+
+	err = d.configureNetworkAccess(srv)
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
+	// Successful creation, so no keys dangle anymore
+	d.danglingKeys = nil
+
+	return nil
+}
+
+func (d *Driver) configureNetworkAccess(srv hcloud.ServerCreateResult) error {
+	if d.UsePrivateNetwork {
+		for {
+			// we need to wait until network is attached
+			log.Infof("Wait until private network attached ...")
+			server, _, err := d.getClient().Server.GetByID(context.Background(), srv.Server.ID)
+			if err != nil {
+				return errors.Wrapf(err, "could not get newly created server [%d]", srv.Server.ID)
+			}
+			if server.PrivateNet != nil {
+				d.IPAddress = server.PrivateNet[0].IP.String()
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+	} else {
+		log.Infof("Using public network ...")
+		d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
+	}
+	return nil
+}
+
+func (d *Driver) waitForRunningServer() error {
+	for {
+		srvstate, err := d.GetState()
+		if err != nil {
+			return errors.Wrap(err, "could not get state")
+		}
+
+		if srvstate == state.Running {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
+	srvopts := hcloud.ServerCreateOpts{
+		Name:     d.GetMachineName(),
+		UserData: d.userData,
+		Labels:   d.serverLabels,
+	}
+
+	networks, err := d.createNetworks()
+	if err != nil {
+		return nil, err
+	}
+	srvopts.Networks = networks
+
+	firewalls, err := d.createFirewalls()
+	if err != nil {
+		return nil, err
+	}
+	srvopts.Firewalls = firewalls
+
+	volumes, err := d.createVolumes()
+	if err != nil {
+		return nil, err
+	}
+	srvopts.Volumes = volumes
+
+	if srvopts.Location, err = d.getLocation(); err != nil {
+		return nil, errors.Wrap(err, "could not get location")
+	}
+	if srvopts.ServerType, err = d.getType(); err != nil {
+		return nil, errors.Wrap(err, "could not get type")
+	}
+	if srvopts.Image, err = d.getImage(); err != nil {
+		return nil, errors.Wrap(err, "could not get image")
+	}
+	key, err := d.getKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get ssh key")
+	}
+	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
+	return &srvopts, nil
+}
+
+func (d *Driver) createNetworks() ([]*hcloud.Network, error) {
+	networks := []*hcloud.Network{}
+	for _, networkIDorName := range d.networks {
+		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get network by ID or name")
+		}
+		if network == nil {
+			return nil, errors.Errorf("network '%s' not found", networkIDorName)
+		}
+		networks = append(networks, network)
+	}
+	return networks, nil
+}
+
+func (d *Driver) createFirewalls() ([]*hcloud.ServerCreateFirewall, error) {
+	firewalls := []*hcloud.ServerCreateFirewall{}
+	for _, firewallIDorName := range d.firewalls {
+		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get firewall by ID or name")
+		}
+		if firewall == nil {
+			return nil, errors.Errorf("firewall '%s' not found", firewallIDorName)
+		}
+		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
+	}
+	return firewalls, nil
+}
+
+func (d *Driver) createVolumes() ([]*hcloud.Volume, error) {
+	volumes := []*hcloud.Volume{}
+	for _, volumeIDorName := range d.volumes {
+		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get volume by ID or name")
+		}
+		if volume == nil {
+			return nil, errors.Errorf("volume '%s' not found", volumeIDorName)
+		}
+		volumes = append(volumes, volume)
+	}
+	return volumes, nil
+}
+
+func (d *Driver) createRemoteKeys() error {
 	if d.KeyID == 0 {
 		log.Infof("Creating SSH key...")
 
@@ -336,119 +497,21 @@ func (d *Driver) Create() error {
 
 		d.cachedAdditionalKeys = append(d.cachedAdditionalKeys, key)
 	}
+	return nil
+}
 
-	log.Infof("Creating Hetzner server...")
-
-	srvopts := hcloud.ServerCreateOpts{
-		Name:     d.GetMachineName(),
-		UserData: d.userData,
-		Labels:   d.serverLabels,
-	}
-
-	networks := []*hcloud.Network{}
-	for _, networkIDorName := range d.networks {
-		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
-		if err != nil {
-			return errors.Wrap(err, "could not get network by ID or name")
-		}
-		if network == nil {
-			return errors.Errorf("network '%s' not found", networkIDorName)
-		}
-		networks = append(networks, network)
-	}
-	srvopts.Networks = networks
-
-	firewalls := []*hcloud.ServerCreateFirewall{}
-	for _, firewallIDorName := range d.firewalls {
-		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
-		if err != nil {
-			return errors.Wrap(err, "could not get firewall by ID or name")
-		}
-		if firewall == nil {
-			return errors.Errorf("firewall '%s' not found", firewallIDorName)
-		}
-		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
-	}
-	srvopts.Firewalls = firewalls
-
-	volumes := []*hcloud.Volume{}
-	for _, volumeIDorName := range d.volumes {
-		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
-		if err != nil {
-			return errors.Wrap(err, "could not get volume by ID or name")
-		}
-		if volume == nil {
-			return errors.Errorf("volume '%s' not found", volumeIDorName)
-		}
-		volumes = append(volumes, volume)
-	}
-	srvopts.Volumes = volumes
-
-	var err error
-	if srvopts.Location, err = d.getLocation(); err != nil {
-		return errors.Wrap(err, "could not get location")
-	}
-	if srvopts.ServerType, err = d.getType(); err != nil {
-		return errors.Wrap(err, "could not get type")
-	}
-	if srvopts.Image, err = d.getImage(); err != nil {
-		return errors.Wrap(err, "could not get image")
-	}
-	key, err := d.getKey()
-	if err != nil {
-		return errors.Wrap(err, "could not get ssh key")
-	}
-	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
-
-	srv, _, err := d.getClient().Server.Create(context.Background(), srvopts)
-	if err != nil {
-		return errors.Wrap(err, "could not create server")
-	}
-
-	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Server.Name, srv.Server.ID, srv.Action.Command, srv.Action.ID)
-	if err = d.waitForAction(srv.Action); err != nil {
-		return errors.Wrap(err, "could not wait for action")
-	}
-
-	d.ServerID = srv.Server.ID
-	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Server.Name, srv.Server.ID)
-
-	for {
-		srvstate, err := d.GetState()
-		if err != nil {
-			return errors.Wrap(err, "could not get state")
-		}
-
-		if srvstate == state.Running {
-			break
-		}
-
-		time.Sleep(1 * time.Second)
-	}
-
-	if d.UsePrivateNetwork {
-		for {
-			// we need to wait until network is attached
-			log.Infof("Wait until private network attached ...")
-			server, _, err := d.getClient().Server.GetByID(context.Background(), srv.Server.ID)
-			if err != nil {
-				return errors.Wrapf(err, "could not get newly created server [%d]", srv.Server.ID)
-			}
-			if server.PrivateNet != nil {
-				d.IPAddress = server.PrivateNet[0].IP.String()
-				break
-			}
-			time.Sleep(1 * time.Second)
+func (d *Driver) prepareLocalKey() error {
+	if d.originalKey != "" {
+		log.Debugf("Copying SSH key...")
+		if err := d.copySSHKeyPair(d.originalKey); err != nil {
+			return errors.Wrap(err, "could not copy ssh key pair")
 		}
 	} else {
-		log.Infof("Using public network ...")
-		d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
+		log.Debugf("Generating SSH key...")
+		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
+			return errors.Wrap(err, "could not generate ssh key")
+		}
 	}
-
-	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
-	// Successful creation, so no keys dangle anymore
-	d.danglingKeys = nil
-
 	return nil
 }
 
@@ -737,19 +800,19 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 	return stype, nil
 }
 
-func (d *Driver) getRemoteKeyWithSameFingerprint(pubkey_byte []byte) (*hcloud.SSHKey, error) {
-	pubkey, _, _, _, err := ssh.ParseAuthorizedKey(pubkey_byte)
+func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud.SSHKey, error) {
+	publicKey, _, _, _, err := ssh.ParseAuthorizedKey(publicKeyBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not parse ssh public key")
 	}
 
-	fp := ssh.FingerprintLegacyMD5(pubkey)
+	fp := ssh.FingerprintLegacyMD5(publicKey)
 
-	remotekey, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
+	remoteKey, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
 	if err != nil {
-		return remotekey, errors.Wrap(err, "could not get sshkey by fingerprint")
+		return remoteKey, errors.Wrap(err, "could not get sshkey by fingerprint")
 	}
-	return remotekey, nil
+	return remoteKey, nil
 }
 
 func (d *Driver) getServerHandle() (*hcloud.Server, error) {
