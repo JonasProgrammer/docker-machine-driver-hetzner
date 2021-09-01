@@ -45,6 +45,7 @@ type Driver struct {
 	firewalls         []string
 	cachedServer      *hcloud.Server
 	serverLabels      map[string]string
+	keyLabels         map[string]string
 
 	additionalKeys       []string
 	AdditionalKeyIDs     []int
@@ -69,6 +70,7 @@ const (
 	flagFirewalls         = "hetzner-firewalls"
 	flagAdditionalKeys    = "hetzner-additional-key"
 	flagServerLabel       = "hetzner-server-label"
+	flagKeyLabel          = "hetzner-key-label"
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -175,6 +177,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Key value pairs of additional labels to assign to the server",
 			Value:  []string{},
 		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_KEY_LABELS",
+			Name:   flagKeyLabel,
+			Usage:  "Key value pairs of additional labels to assign to the SSH key",
+			Value:  []string{},
+		},
 	}
 }
 
@@ -222,6 +230,14 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 			return errors.Errorf("server label %v is not in key=value format", label)
 		}
 		d.serverLabels[split[0]] = split[1]
+	}
+	d.keyLabels = make(map[string]string)
+	for _, label := range opts.StringSlice(flagKeyLabel) {
+		split := strings.SplitN(label, "=", 2)
+		if len(split) != 2 {
+			return errors.Errorf("key label %v is not in key=value format", label)
+		}
+		d.keyLabels[split[0]] = split[1]
 	}
 	return nil
 }
@@ -465,7 +481,7 @@ func (d *Driver) createRemoteKeys() error {
 		if key == nil {
 			log.Infof("SSH key not found in Hetzner. Uploading...")
 
-			key, err = d.makeKey(d.GetMachineName(), string(buf))
+			key, err = d.makeKey(d.GetMachineName(), string(buf), d.keyLabels)
 			if err != nil {
 				return err
 			}
@@ -483,7 +499,7 @@ func (d *Driver) createRemoteKeys() error {
 		}
 		if key == nil {
 			log.Infof("Creating new key for %v...", pubkey)
-			key, err = d.makeKey(fmt.Sprintf("%v-additional-%d", d.GetMachineName(), i), pubkey)
+			key, err = d.makeKey(fmt.Sprintf("%v-additional-%d", d.GetMachineName(), i), pubkey, d.keyLabels)
 
 			if err != nil {
 				return errors.Wrapf(err, "error creating new key for %v", pubkey)
@@ -516,10 +532,11 @@ func (d *Driver) prepareLocalKey() error {
 }
 
 // Creates a new key for the machine and appends it to the dangling key list
-func (d *Driver) makeKey(name string, pubkey string) (*hcloud.SSHKey, error) {
+func (d *Driver) makeKey(name string, pubkey string, labels map[string]string) (*hcloud.SSHKey, error) {
 	keyopts := hcloud.SSHKeyCreateOpts{
 		Name:      name,
 		PublicKey: pubkey,
+		Labels:    labels,
 	}
 
 	key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
