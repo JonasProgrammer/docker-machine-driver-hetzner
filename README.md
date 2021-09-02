@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.3.0/docker-machine-driver-hetzner_3.3.0_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.3.0_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.4.0/docker-machine-driver-hetzner_3.4.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_3.4.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -105,6 +105,7 @@ $ docker-machine create \
 - `--hetzner-use-private-network`: Use private network
 - `--hetzner-firewalls`: Firewall IDs or names which should be applied on the server
 - `--hetzner-server-label`: `key=value` pairs of additional metadata to assign to the server.
+- `--hetzner-key-label`: `key=value` pairs of additional metadata to assign to SSH key (only applies if newly creadted).
 
 #### Existing SSH keys
 
@@ -138,8 +139,8 @@ was used during creation.
 | `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               | -                          |
 | `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
 | `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
-| `--hetzner-server-label`            | `HETZNER_SERVER_LABELS`           | `[]`                       |
-
+| `--hetzner-server-label`            | (inoperative)                     | `[]`                       |
+| `--hetzner-key-label`               | (inoperative)                     | `[]`                       |
 
 ## Building from source
 
