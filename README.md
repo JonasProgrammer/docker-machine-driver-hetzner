@@ -128,22 +128,22 @@ was used during creation.
 
 | CLI option                          | Environment variable              | Default                    |
 | ----------------------------------- | --------------------------------- | -------------------------- |
-| **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               | -                          |
+| **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               |                            |
 | `--hetzner-image`                   | `HETZNER_IMAGE`                   | `ubuntu-18.04`             |
-| `--hetzner-image-id`                | `HETZNER_IMAGE_ID`                | -                          |
+| `--hetzner-image-id`                | `HETZNER_IMAGE_ID`                |                            |
 | `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
-| `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
-| `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
+| `--hetzner-server-location`         | `HETZNER_LOCATION`                | *(let Hetzner choose)*     |
+| `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | *(generate new keypair)*   |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
-| `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         | -                          |
-| `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
-| `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
-| `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               | -                          |
-| `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
+| `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         |                            |
+| `--hetzner-user-data`               | `HETZNER_USER_DATA`               |                            |
+| `--hetzner-networks`                | `HETZNER_NETWORKS`                |                            |
+| `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               |                            |
+| `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 |                            |
 | `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
 | `--hetzner-server-label`            | (inoperative)                     | `[]`                       |
 | `--hetzner-key-label`               | (inoperative)                     | `[]`                       |
-| `--hetzner-placement-group`         | `HETZNER_PLACEMENT_GROUP`         | -                          |
+| `--hetzner-placement-group`         | `HETZNER_PLACEMENT_GROUP`         |                            |
 | `--hetzner-auto-spread`             | `HETZNER_AUTO_SPREAD`             | false                      |
 
 ## Building from source

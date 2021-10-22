@@ -657,29 +657,30 @@ func (d *Driver) Remove() error {
 				return errors.Wrap(err, "could not delete server")
 			}
 
-			err = d.removeEmptyServerPlacementGroup(srv)
-			if err != nil {
-				log.Error(err) // not a hard failure
+			// failure to remove a placement group is not a hard error
+			if softErr := d.removeEmptyServerPlacementGroup(srv); softErr != nil {
+				log.Error(softErr)
 			}
 		}
 	}
 
-	// Failing to remove these is just a soft error
+	// failure to remove a key is not ha hard error
 	for i, id := range d.AdditionalKeyIDs {
 		log.Infof(" -> Destroying additional key #%d (%d)", i, id)
-		key, _, err := d.getClient().SSHKey.GetByID(context.Background(), id)
-		if err != nil {
-			log.Warnf(" ->  -> could not retrieve key %v", err)
+		key, _, softErr := d.getClient().SSHKey.GetByID(context.Background(), id)
+		if softErr != nil {
+			log.Warnf(" ->  -> could not retrieve key %v", softErr)
 		} else if key == nil {
 			log.Warnf(" ->  -> %d no longer exists", id)
 		}
 
-		_, err = d.getClient().SSHKey.Delete(context.Background(), key)
-		if err != nil {
-			log.Warnf(" ->  -> could not remove key: %v", err)
+		_, softErr = d.getClient().SSHKey.Delete(context.Background(), key)
+		if softErr != nil {
+			log.Warnf(" ->  -> could not remove key: %v", softErr)
 		}
 	}
 
+	// failure to remove a server-specific key is a hard error
 	if !d.IsExistingKey && d.KeyID != 0 {
 		key, err := d.getKey()
 		if err != nil {
@@ -953,16 +954,16 @@ func (d *Driver) makePlacementGroup(name string, labels map[string]string) (*hcl
 		d.dangling = append(d.dangling, func() {
 			_, err := d.getClient().PlacementGroup.Delete(context.Background(), grp.PlacementGroup)
 			if err != nil {
-				log.Error(fmt.Errorf("could not delete placement group: %w", err))
+				log.Errorf("could not delete placement group: %v", err)
 			}
 		})
 	}
 
 	if err != nil {
-		err = fmt.Errorf("could not create placement group: %w", err)
+		return nil, fmt.Errorf("could not create placement group: %w", err)
 	}
 
-	return grp.PlacementGroup, err
+	return grp.PlacementGroup, nil
 }
 
 func (d *Driver) getPlacementGroup() (*hcloud.PlacementGroup, error) {
@@ -1006,9 +1007,9 @@ func (d *Driver) removeEmptyServerPlacementGroup(srv *hcloud.Server) error {
 	if auto, exists := pg.Labels[d.labelName(labelAutoCreated)]; exists && auto == "true" {
 		_, err := d.getClient().PlacementGroup.Delete(context.Background(), pg)
 		if err != nil {
-			err = fmt.Errorf("could not remove placement group: %w", err)
+			return fmt.Errorf("could not remove placement group: %w", err)
 		}
-		return err
+		return nil
 	} else {
 		log.Debugf("group not auto-created, ignoring: %v", pg)
 		return nil
