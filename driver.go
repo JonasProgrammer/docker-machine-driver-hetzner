@@ -36,7 +36,7 @@ type Driver struct {
 	cachedKey         *hcloud.SSHKey
 	IsExistingKey     bool
 	originalKey       string
-	danglingKeys      []*hcloud.SSHKey
+	dangling          []func()
 	ServerID          int
 	userData          string
 	volumes           []string
@@ -46,6 +46,8 @@ type Driver struct {
 	cachedServer      *hcloud.Server
 	serverLabels      map[string]string
 	keyLabels         map[string]string
+	placementGroup    string
+	cachedPGrp        *hcloud.PlacementGroup
 
 	additionalKeys       []string
 	AdditionalKeyIDs     []int
@@ -71,6 +73,14 @@ const (
 	flagAdditionalKeys    = "hetzner-additional-key"
 	flagServerLabel       = "hetzner-server-label"
 	flagKeyLabel          = "hetzner-key-label"
+	flagPlacementGroup    = "hetzner-placement-group"
+	flagAutoSpread        = "hetzner-auto-spread"
+
+	labelNamespace    = "docker-machine"
+	labelAutoSpreadPg = "auto-spread"
+	labelAutoCreated  = "auto-created"
+
+	autoSpreadPgName = "__auto_spread"
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -79,7 +89,6 @@ func NewDriver() *Driver {
 		Image:         defaultImage,
 		Type:          defaultType,
 		IsExistingKey: false,
-		danglingKeys:  []*hcloud.SSHKey{},
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser: drivers.DefaultSSHUser,
 			SSHPort: drivers.DefaultSSHPort,
@@ -183,6 +192,17 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Key value pairs of additional labels to assign to the SSH key",
 			Value:  []string{},
 		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_PLACEMENT_GROUP",
+			Name:   flagPlacementGroup,
+			Usage:  "Placement group ID or name to add the server to; will be created if it does not exist",
+			Value:  "",
+		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_AUTO_SPREAD",
+			Name:   flagAutoSpread,
+			Usage:  "Auto-spread on a docker-machine-specific default placement group",
+		},
 	}
 }
 
@@ -203,6 +223,14 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
 	d.firewalls = opts.StringSlice(flagFirewalls)
 	d.additionalKeys = opts.StringSlice(flagAdditionalKeys)
+
+	d.placementGroup = opts.String(flagPlacementGroup)
+	if opts.Bool(flagAutoSpread) {
+		if d.placementGroup != "" {
+			return errors.Errorf(flagAutoSpread + " and " + flagPlacementGroup + " are mutually exclusive")
+		}
+		d.placementGroup = autoSpreadPgName
+	}
 
 	err := d.setLabelsFromFlags(opts)
 	if err != nil {
@@ -283,6 +311,10 @@ func (d *Driver) PreCreateCheck() error {
 		return errors.Wrap(err, "could not get location")
 	}
 
+	if _, err := d.getPlacementGroup(); err != nil {
+		return fmt.Errorf("could not create placement group: %w", err)
+	}
+
 	if d.UsePrivateNetwork && len(d.networks) == 0 {
 		return errors.Errorf("No private network attached.")
 	}
@@ -297,7 +329,7 @@ func (d *Driver) Create() error {
 		return err
 	}
 
-	defer d.destroyDanglingKeys()
+	defer d.destroyDangling()
 	err = d.createRemoteKeys()
 	if err != nil {
 		return err
@@ -335,7 +367,7 @@ func (d *Driver) Create() error {
 
 	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
 	// Successful creation, so no keys dangle anymore
-	d.danglingKeys = nil
+	d.dangling = nil
 
 	return nil
 }
@@ -379,10 +411,16 @@ func (d *Driver) waitForRunningServer() error {
 }
 
 func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
+	pgrp, err := d.getPlacementGroup()
+	if err != nil {
+		return nil, err
+	}
+
 	srvopts := hcloud.ServerCreateOpts{
-		Name:     d.GetMachineName(),
-		UserData: d.userData,
-		Labels:   d.serverLabels,
+		Name:           d.GetMachineName(),
+		UserData:       d.userData,
+		Labels:         d.serverLabels,
+		PlacementGroup: pgrp,
 	}
 
 	networks, err := d.createNetworks()
@@ -546,16 +584,19 @@ func (d *Driver) makeKey(name string, pubkey string, labels map[string]string) (
 		return nil, errors.Errorf("key upload did not return an error, but key was nil")
 	}
 
-	d.danglingKeys = append(d.danglingKeys, key)
+	d.dangling = append(d.dangling, func() {
+		_, err := d.getClient().SSHKey.Delete(context.Background(), key)
+		if err != nil {
+			log.Error(fmt.Errorf("could not delete ssh key: %w", err))
+		}
+	})
+
 	return key, nil
 }
 
-func (d *Driver) destroyDanglingKeys() {
-	for _, key := range d.danglingKeys {
-		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
-			log.Errorf("could not delete ssh key: %v", err)
-			return
-		}
+func (d *Driver) destroyDangling() {
+	for _, destructor := range d.dangling {
+		destructor()
 	}
 }
 
@@ -615,25 +656,31 @@ func (d *Driver) Remove() error {
 			if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
 				return errors.Wrap(err, "could not delete server")
 			}
+
+			// failure to remove a placement group is not a hard error
+			if softErr := d.removeEmptyServerPlacementGroup(srv); softErr != nil {
+				log.Error(softErr)
+			}
 		}
 	}
 
-	// Failing to remove these is just a soft error
+	// failure to remove a key is not ha hard error
 	for i, id := range d.AdditionalKeyIDs {
 		log.Infof(" -> Destroying additional key #%d (%d)", i, id)
-		key, _, err := d.getClient().SSHKey.GetByID(context.Background(), id)
-		if err != nil {
-			log.Warnf(" ->  -> could not retrieve key %v", err)
+		key, _, softErr := d.getClient().SSHKey.GetByID(context.Background(), id)
+		if softErr != nil {
+			log.Warnf(" ->  -> could not retrieve key %v", softErr)
 		} else if key == nil {
 			log.Warnf(" ->  -> %d no longer exists", id)
 		}
 
-		_, err = d.getClient().SSHKey.Delete(context.Background(), key)
-		if err != nil {
-			log.Warnf(" ->  -> could not remove key: %v", err)
+		_, softErr = d.getClient().SSHKey.Delete(context.Background(), key)
+		if softErr != nil {
+			log.Warnf(" ->  -> could not remove key: %v", softErr)
 		}
 	}
 
+	// failure to remove a server-specific key is a hard error
 	if !d.IsExistingKey && d.KeyID != 0 {
 		key, err := d.getKey()
 		if err != nil {
@@ -869,4 +916,102 @@ func (d *Driver) waitForAction(a *hcloud.Action) error {
 		time.Sleep(1 * time.Second)
 	}
 	return nil
+}
+
+func (d *Driver) labelName(name string) string {
+	return labelNamespace + "/" + name
+}
+
+func (d *Driver) getAutoPlacementGroup() (*hcloud.PlacementGroup, error) {
+	res, err := d.getClient().PlacementGroup.AllWithOpts(context.Background(), hcloud.PlacementGroupListOpts{
+		ListOpts: hcloud.ListOpts{LabelSelector: d.labelName(labelAutoSpreadPg)},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res) != 0 {
+		return res[0], nil
+	}
+
+	grp, err := d.makePlacementGroup("Docker-Machine auto spread", map[string]string{
+		d.labelName(labelAutoSpreadPg): "true",
+		d.labelName(labelAutoCreated):  "true",
+	})
+
+	return grp, err
+}
+
+func (d *Driver) makePlacementGroup(name string, labels map[string]string) (*hcloud.PlacementGroup, error) {
+	grp, _, err := d.getClient().PlacementGroup.Create(context.Background(), hcloud.PlacementGroupCreateOpts{
+		Name:   name,
+		Labels: labels,
+		Type:   "spread",
+	})
+
+	if grp.PlacementGroup != nil {
+		d.dangling = append(d.dangling, func() {
+			_, err := d.getClient().PlacementGroup.Delete(context.Background(), grp.PlacementGroup)
+			if err != nil {
+				log.Errorf("could not delete placement group: %v", err)
+			}
+		})
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create placement group: %w", err)
+	}
+
+	return grp.PlacementGroup, nil
+}
+
+func (d *Driver) getPlacementGroup() (*hcloud.PlacementGroup, error) {
+	if d.placementGroup == "" {
+		return nil, nil
+	} else if d.cachedPGrp != nil {
+		return d.cachedPGrp, nil
+	}
+
+	name := d.placementGroup
+	if name == autoSpreadPgName {
+		grp, err := d.getAutoPlacementGroup()
+		d.cachedPGrp = grp
+		return grp, err
+	} else {
+		client := d.getClient().PlacementGroup
+		grp, _, err := client.Get(context.Background(), name)
+		if err != nil {
+			return nil, fmt.Errorf("could not get placement group: %w", err)
+		}
+
+		if grp != nil {
+			return grp, nil
+		}
+
+		return d.makePlacementGroup(name, map[string]string{d.labelName(labelAutoCreated): "true"})
+	}
+}
+
+func (d *Driver) removeEmptyServerPlacementGroup(srv *hcloud.Server) error {
+	pg := srv.PlacementGroup
+	if pg == nil {
+		return nil
+	}
+
+	if len(pg.Servers) > 1 {
+		log.Debugf("more than 1 servers in group, ignoring %v", pg)
+		return nil
+	}
+
+	if auto, exists := pg.Labels[d.labelName(labelAutoCreated)]; exists && auto == "true" {
+		_, err := d.getClient().PlacementGroup.Delete(context.Background(), pg)
+		if err != nil {
+			return fmt.Errorf("could not remove placement group: %w", err)
+		}
+		return nil
+	} else {
+		log.Debugf("group not auto-created, ignoring: %v", pg)
+		return nil
+	}
 }
