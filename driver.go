@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// Driver contains hetzner-specific data to implement [drivers.Driver]
 type Driver struct {
 	*drivers.BaseDriver
 
@@ -35,7 +36,7 @@ type Driver struct {
 	cachedKey         *hcloud.SSHKey
 	IsExistingKey     bool
 	originalKey       string
-	danglingKeys      []*hcloud.SSHKey
+	dangling          []func()
 	ServerID          int
 	cachedServer      *hcloud.Server
 	userData          string
@@ -44,6 +45,9 @@ type Driver struct {
 	UsePrivateNetwork bool
 	Firewalls         []string
 	ServerLabels      map[string]string
+	keyLabels         map[string]string
+	placementGroup    string
+	cachedPGrp        *hcloud.PlacementGroup
 
 	AdditionalKeys       []string
 	AdditionalKeyIDs     []int
@@ -68,14 +72,23 @@ const (
 	flagFirewalls         = "hetzner-firewalls"
 	flagAdditionalKeys    = "hetzner-additional-key"
 	flagServerLabel       = "hetzner-server-label"
+	flagKeyLabel          = "hetzner-key-label"
+	flagPlacementGroup    = "hetzner-placement-group"
+	flagAutoSpread        = "hetzner-auto-spread"
+
+	labelNamespace    = "docker-machine"
+	labelAutoSpreadPg = "auto-spread"
+	labelAutoCreated  = "auto-created"
+
+	autoSpreadPgName = "__auto_spread"
 )
 
+// NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
 func NewDriver() *Driver {
 	return &Driver{
 		Image:         defaultImage,
 		Type:          defaultType,
 		IsExistingKey: false,
-		danglingKeys:  []*hcloud.SSHKey{},
 		BaseDriver: &drivers.BaseDriver{
 			SSHUser: drivers.DefaultSSHUser,
 			SSHPort: drivers.DefaultSSHPort,
@@ -83,10 +96,12 @@ func NewDriver() *Driver {
 	}
 }
 
+// DriverName returns the hard-coded string "hetzner"; see [drivers.Driver.DriverName]
 func (d *Driver) DriverName() string {
 	return "hetzner"
 }
 
+// GetCreateFlags retrieves additional driver-specific arguments; see [drivers.Driver.GetCreateFlags]
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	return []mcnflag.Flag{
 		mcnflag.StringFlag{
@@ -171,9 +186,28 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Key value pairs of additional labels to assign to the server",
 			Value:  []string{},
 		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "HETZNER_KEY_LABELS",
+			Name:   flagKeyLabel,
+			Usage:  "Key value pairs of additional labels to assign to the SSH key",
+			Value:  []string{},
+		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_PLACEMENT_GROUP",
+			Name:   flagPlacementGroup,
+			Usage:  "Placement group ID or name to add the server to; will be created if it does not exist",
+			Value:  "",
+		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_AUTO_SPREAD",
+			Name:   flagAutoSpread,
+			Usage:  "Auto-spread on a docker-machine-specific default placement group",
+		},
 	}
 }
 
+// SetConfigFromFlags handles additional driver arguments as retrieved by [Driver.GetCreateFlags];
+// see [drivers.Driver.SetConfigFromFlags]
 func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
@@ -189,6 +223,14 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
 	d.Firewalls = opts.StringSlice(flagFirewalls)
 	d.AdditionalKeys = opts.StringSlice(flagAdditionalKeys)
+
+	d.placementGroup = opts.String(flagPlacementGroup)
+	if opts.Bool(flagAutoSpread) {
+		if d.placementGroup != "" {
+			return errors.Errorf(flagAutoSpread + " and " + flagPlacementGroup + " are mutually exclusive")
+		}
+		d.placementGroup = autoSpreadPgName
+	}
 
 	err := d.setLabelsFromFlags(opts)
 	if err != nil {
@@ -217,9 +259,18 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 		}
 		d.ServerLabels[split[0]] = split[1]
 	}
+	d.keyLabels = make(map[string]string)
+	for _, label := range opts.StringSlice(flagKeyLabel) {
+		split := strings.SplitN(label, "=", 2)
+		if len(split) != 2 {
+			return errors.Errorf("key label %v is not in key=value format", label)
+		}
+		d.keyLabels[split[0]] = split[1]
+	}
 	return nil
 }
 
+// PreCreateCheck validates the Driver data is in a valid state for creation; see [drivers.Driver.PreCreateCheck]
 func (d *Driver) PreCreateCheck() error {
 	if d.IsExistingKey {
 		if d.originalKey == "" {
@@ -260,6 +311,10 @@ func (d *Driver) PreCreateCheck() error {
 		return errors.Wrap(err, "could not get location")
 	}
 
+	if _, err := d.getPlacementGroup(); err != nil {
+		return fmt.Errorf("could not create placement group: %w", err)
+	}
+
 	if d.UsePrivateNetwork && len(d.Networks) == 0 {
 		return errors.Errorf("No private network attached.")
 	}
@@ -267,132 +322,27 @@ func (d *Driver) PreCreateCheck() error {
 	return nil
 }
 
+// Create actually creates the hetzner-cloud server; see [drivers.Driver.Create]
 func (d *Driver) Create() error {
-	if d.originalKey != "" {
-		log.Debugf("Copying SSH key...")
-		if err := d.copySSHKeyPair(d.originalKey); err != nil {
-			return errors.Wrap(err, "could not copy ssh key pair")
-		}
-	} else {
-		log.Debugf("Generating SSH key...")
-		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-			return errors.Wrap(err, "could not generate ssh key")
-		}
+	err := d.prepareLocalKey()
+	if err != nil {
+		return err
 	}
 
-	defer d.destroyDanglingKeys()
-	if d.KeyID == 0 {
-		log.Infof("Creating SSH key...")
-
-		buf, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
-		if err != nil {
-			return errors.Wrap(err, "could not read ssh public key")
-		}
-
-		key, err := d.getRemoteKeyWithSameFingerprint(buf)
-		if err != nil {
-			return errors.Wrap(err, "error retrieving potentially existing key")
-		}
-		if key == nil {
-			log.Infof("SSH key not found in Hetzner. Uploading...")
-
-			key, err = d.makeKey(d.GetMachineName(), string(buf))
-			if err != nil {
-				return err
-			}
-		} else {
-			d.IsExistingKey = true
-			log.Debugf("SSH key found in Hetzner. ID: %d", key.ID)
-		}
-
-		d.KeyID = key.ID
-	}
-	for i, pubkey := range d.AdditionalKeys {
-		key, err := d.getRemoteKeyWithSameFingerprint([]byte(pubkey))
-		if err != nil {
-			return errors.Wrapf(err, "error checking for existing key for %v", pubkey)
-		}
-		if key == nil {
-			log.Infof("Creating new key for %v...", pubkey)
-			key, err = d.makeKey(fmt.Sprintf("%v-additional-%d", d.GetMachineName(), i), pubkey)
-
-			if err != nil {
-				return errors.Wrapf(err, "error creating new key for %v", pubkey)
-			}
-
-			log.Infof(" -> Created %v", key.ID)
-			d.AdditionalKeyIDs = append(d.AdditionalKeyIDs, key.ID)
-		} else {
-			log.Infof("Using existing key (%v) %v", key.ID, key.Name)
-		}
-
-		d.cachedAdditionalKeys = append(d.cachedAdditionalKeys, key)
+	defer d.destroyDangling()
+	err = d.createRemoteKeys()
+	if err != nil {
+		return err
 	}
 
 	log.Infof("Creating Hetzner server...")
 
-	srvopts := hcloud.ServerCreateOpts{
-		Name:     d.GetMachineName(),
-		UserData: d.userData,
-		Labels:   d.ServerLabels,
-	}
-
-	networks := []*hcloud.Network{}
-	for _, networkIDorName := range d.Networks {
-		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
-		if err != nil {
-			return errors.Wrap(err, "could not get network by ID or name")
-		}
-		if network == nil {
-			return errors.Errorf("network '%s' not found", networkIDorName)
-		}
-		networks = append(networks, network)
-	}
-	srvopts.Networks = networks
-
-	firewalls := []*hcloud.ServerCreateFirewall{}
-	for _, firewallIDorName := range d.Firewalls {
-		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
-		if err != nil {
-			return errors.Wrap(err, "could not get firewall by ID or name")
-		}
-		if firewall == nil {
-			return errors.Errorf("firewall '%s' not found", firewallIDorName)
-		}
-		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
-	}
-	srvopts.Firewalls = firewalls
-
-	volumes := []*hcloud.Volume{}
-	for _, volumeIDorName := range d.Volumes {
-		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
-		if err != nil {
-			return errors.Wrap(err, "could not get volume by ID or name")
-		}
-		if volume == nil {
-			return errors.Errorf("volume '%s' not found", volumeIDorName)
-		}
-		volumes = append(volumes, volume)
-	}
-	srvopts.Volumes = volumes
-
-	var err error
-	if srvopts.Location, err = d.getLocation(); err != nil {
-		return errors.Wrap(err, "could not get location")
-	}
-	if srvopts.ServerType, err = d.getType(); err != nil {
-		return errors.Wrap(err, "could not get type")
-	}
-	if srvopts.Image, err = d.getImage(); err != nil {
-		return errors.Wrap(err, "could not get image")
-	}
-	key, err := d.getKey()
+	srvopts, err := d.makeCreateServerOptions()
 	if err != nil {
-		return errors.Wrap(err, "could not get ssh key")
+		return err
 	}
-	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
 
-	srv, _, err := d.getClient().Server.Create(context.Background(), srvopts)
+	srv, _, err := d.getClient().Server.Create(context.Background(), *srvopts)
 	if err != nil {
 		return errors.Wrap(err, "could not create server")
 	}
@@ -405,19 +355,24 @@ func (d *Driver) Create() error {
 	d.ServerID = srv.Server.ID
 	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Server.Name, srv.Server.ID)
 
-	for {
-		srvstate, err := d.GetState()
-		if err != nil {
-			return errors.Wrap(err, "could not get state")
-		}
-
-		if srvstate == state.Running {
-			break
-		}
-
-		time.Sleep(1 * time.Second)
+	err = d.waitForRunningServer()
+	if err != nil {
+		return err
 	}
 
+	err = d.configureNetworkAccess(srv)
+	if err != nil {
+		return err
+	}
+
+	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
+	// Successful creation, so no keys dangle anymore
+	d.dangling = nil
+
+	return nil
+}
+
+func (d *Driver) configureNetworkAccess(srv hcloud.ServerCreateResult) error {
 	if d.UsePrivateNetwork {
 		for {
 			// we need to wait until network is attached
@@ -436,19 +391,190 @@ func (d *Driver) Create() error {
 		log.Infof("Using public network ...")
 		d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
 	}
+	return nil
+}
 
-	log.Infof(" -> Server %s[%d] ready. Ip %s", srv.Server.Name, srv.Server.ID, d.IPAddress)
-	// Successful creation, so no keys dangle anymore
-	d.danglingKeys = nil
+func (d *Driver) waitForRunningServer() error {
+	for {
+		srvstate, err := d.GetState()
+		if err != nil {
+			return errors.Wrap(err, "could not get state")
+		}
 
+		if srvstate == state.Running {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
+	pgrp, err := d.getPlacementGroup()
+	if err != nil {
+		return nil, err
+	}
+
+	srvopts := hcloud.ServerCreateOpts{
+		Name:           d.GetMachineName(),
+		UserData:       d.userData,
+		Labels:         d.ServerLabels,
+		PlacementGroup: pgrp,
+	}
+
+	networks, err := d.createNetworks()
+	if err != nil {
+		return nil, err
+	}
+	srvopts.Networks = networks
+
+	firewalls, err := d.createFirewalls()
+	if err != nil {
+		return nil, err
+	}
+	srvopts.Firewalls = firewalls
+
+	volumes, err := d.createVolumes()
+	if err != nil {
+		return nil, err
+	}
+	srvopts.Volumes = volumes
+
+	if srvopts.Location, err = d.getLocation(); err != nil {
+		return nil, errors.Wrap(err, "could not get location")
+	}
+	if srvopts.ServerType, err = d.getType(); err != nil {
+		return nil, errors.Wrap(err, "could not get type")
+	}
+	if srvopts.Image, err = d.getImage(); err != nil {
+		return nil, errors.Wrap(err, "could not get image")
+	}
+	key, err := d.getKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get ssh key")
+	}
+	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
+	return &srvopts, nil
+}
+
+func (d *Driver) createNetworks() ([]*hcloud.Network, error) {
+	networks := []*hcloud.Network{}
+	for _, networkIDorName := range d.Networks {
+		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get network by ID or name")
+		}
+		if network == nil {
+			return nil, errors.Errorf("network '%s' not found", networkIDorName)
+		}
+		networks = append(networks, network)
+	}
+	return networks, nil
+}
+
+func (d *Driver) createFirewalls() ([]*hcloud.ServerCreateFirewall, error) {
+	firewalls := []*hcloud.ServerCreateFirewall{}
+	for _, firewallIDorName := range d.Firewalls {
+		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get firewall by ID or name")
+		}
+		if firewall == nil {
+			return nil, errors.Errorf("firewall '%s' not found", firewallIDorName)
+		}
+		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
+	}
+	return firewalls, nil
+}
+
+func (d *Driver) createVolumes() ([]*hcloud.Volume, error) {
+	volumes := []*hcloud.Volume{}
+	for _, volumeIDorName := range d.Volumes {
+		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get volume by ID or name")
+		}
+		if volume == nil {
+			return nil, errors.Errorf("volume '%s' not found", volumeIDorName)
+		}
+		volumes = append(volumes, volume)
+	}
+	return volumes, nil
+}
+
+func (d *Driver) createRemoteKeys() error {
+	if d.KeyID == 0 {
+		log.Infof("Creating SSH key...")
+
+		buf, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
+		if err != nil {
+			return errors.Wrap(err, "could not read ssh public key")
+		}
+
+		key, err := d.getRemoteKeyWithSameFingerprint(buf)
+		if err != nil {
+			return errors.Wrap(err, "error retrieving potentially existing key")
+		}
+		if key == nil {
+			log.Infof("SSH key not found in Hetzner. Uploading...")
+
+			key, err = d.makeKey(d.GetMachineName(), string(buf), d.keyLabels)
+			if err != nil {
+				return err
+			}
+		} else {
+			d.IsExistingKey = true
+			log.Debugf("SSH key found in Hetzner. ID: %d", key.ID)
+		}
+
+		d.KeyID = key.ID
+	}
+	for i, pubkey := range d.AdditionalKeys {
+		key, err := d.getRemoteKeyWithSameFingerprint([]byte(pubkey))
+		if err != nil {
+			return errors.Wrapf(err, "error checking for existing key for %v", pubkey)
+		}
+		if key == nil {
+			log.Infof("Creating new key for %v...", pubkey)
+			key, err = d.makeKey(fmt.Sprintf("%v-additional-%d", d.GetMachineName(), i), pubkey, d.keyLabels)
+
+			if err != nil {
+				return errors.Wrapf(err, "error creating new key for %v", pubkey)
+			}
+
+			log.Infof(" -> Created %v", key.ID)
+			d.AdditionalKeyIDs = append(d.AdditionalKeyIDs, key.ID)
+		} else {
+			log.Infof("Using existing key (%v) %v", key.ID, key.Name)
+		}
+
+		d.cachedAdditionalKeys = append(d.cachedAdditionalKeys, key)
+	}
+	return nil
+}
+
+func (d *Driver) prepareLocalKey() error {
+	if d.originalKey != "" {
+		log.Debugf("Copying SSH key...")
+		if err := d.copySSHKeyPair(d.originalKey); err != nil {
+			return errors.Wrap(err, "could not copy ssh key pair")
+		}
+	} else {
+		log.Debugf("Generating SSH key...")
+		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
+			return errors.Wrap(err, "could not generate ssh key")
+		}
+	}
 	return nil
 }
 
 // Creates a new key for the machine and appends it to the dangling key list
-func (d *Driver) makeKey(name string, pubkey string) (*hcloud.SSHKey, error) {
+func (d *Driver) makeKey(name string, pubkey string, labels map[string]string) (*hcloud.SSHKey, error) {
 	keyopts := hcloud.SSHKeyCreateOpts{
 		Name:      name,
 		PublicKey: pubkey,
+		Labels:    labels,
 	}
 
 	key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
@@ -458,23 +584,28 @@ func (d *Driver) makeKey(name string, pubkey string) (*hcloud.SSHKey, error) {
 		return nil, errors.Errorf("key upload did not return an error, but key was nil")
 	}
 
-	d.danglingKeys = append(d.danglingKeys, key)
+	d.dangling = append(d.dangling, func() {
+		_, err := d.getClient().SSHKey.Delete(context.Background(), key)
+		if err != nil {
+			log.Error(fmt.Errorf("could not delete ssh key: %w", err))
+		}
+	})
+
 	return key, nil
 }
 
-func (d *Driver) destroyDanglingKeys() {
-	for _, key := range d.danglingKeys {
-		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
-			log.Errorf("could not delete ssh key: %v", err)
-			return
-		}
+func (d *Driver) destroyDangling() {
+	for _, destructor := range d.dangling {
+		destructor()
 	}
 }
 
+// GetSSHHostname retrieves the SSH host to connect to the machine; see [drivers.Driver.GetSSHHostname]
 func (d *Driver) GetSSHHostname() (string, error) {
 	return d.GetIP()
 }
 
+// GetURL retrieves the URL of the docker daemon on the machine; see [drivers.Driver.GetURL]
 func (d *Driver) GetURL() (string, error) {
 	if err := drivers.MustBeRunning(d); err != nil {
 		return "", errors.Wrap(err, "could not execute drivers.MustBeRunning")
@@ -488,6 +619,7 @@ func (d *Driver) GetURL() (string, error) {
 	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, "2376")), nil
 }
 
+// GetState retrieves the state the machine is currently in; see [drivers.Driver.GetState]
 func (d *Driver) GetState() (state.State, error) {
 	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
 	if err != nil {
@@ -508,6 +640,7 @@ func (d *Driver) GetState() (state.State, error) {
 	return state.None, nil
 }
 
+// Remove deletes the hetzner server and additional resources created during creation; see [drivers.Driver.Remove]
 func (d *Driver) Remove() error {
 	if d.ServerID != 0 {
 		srv, err := d.getServerHandle()
@@ -523,25 +656,31 @@ func (d *Driver) Remove() error {
 			if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
 				return errors.Wrap(err, "could not delete server")
 			}
+
+			// failure to remove a placement group is not a hard error
+			if softErr := d.removeEmptyServerPlacementGroup(srv); softErr != nil {
+				log.Error(softErr)
+			}
 		}
 	}
 
-	// Failing to remove these is just a soft error
+	// failure to remove a key is not ha hard error
 	for i, id := range d.AdditionalKeyIDs {
 		log.Infof(" -> Destroying additional key #%d (%d)", i, id)
-		key, _, err := d.getClient().SSHKey.GetByID(context.Background(), id)
-		if err != nil {
-			log.Warnf(" ->  -> could not retrieve key %v", err)
+		key, _, softErr := d.getClient().SSHKey.GetByID(context.Background(), id)
+		if softErr != nil {
+			log.Warnf(" ->  -> could not retrieve key %v", softErr)
 		} else if key == nil {
 			log.Warnf(" ->  -> %d no longer exists", id)
 		}
 
-		_, err = d.getClient().SSHKey.Delete(context.Background(), key)
-		if err != nil {
-			log.Warnf(" ->  -> could not remove key: %v", err)
+		_, softErr = d.getClient().SSHKey.Delete(context.Background(), key)
+		if softErr != nil {
+			log.Warnf(" ->  -> could not remove key: %v", softErr)
 		}
 	}
 
+	// failure to remove a server-specific key is a hard error
 	if !d.IsExistingKey && d.KeyID != 0 {
 		key, err := d.getKey()
 		if err != nil {
@@ -562,6 +701,7 @@ func (d *Driver) Remove() error {
 	return nil
 }
 
+// Restart instructs the hetzner cloud server to reboot; see [drivers.Driver.Restart]
 func (d *Driver) Restart() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -581,6 +721,7 @@ func (d *Driver) Restart() error {
 	return d.waitForAction(act)
 }
 
+// Start instructs the hetzner cloud server to power up; see [drivers.Driver.Start]
 func (d *Driver) Start() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -600,6 +741,7 @@ func (d *Driver) Start() error {
 	return d.waitForAction(act)
 }
 
+// Stop instructs the hetzner cloud server to shut down; see [drivers.Driver.Stop]
 func (d *Driver) Stop() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -619,6 +761,7 @@ func (d *Driver) Stop() error {
 	return d.waitForAction(act)
 }
 
+// Kill forcefully shuts down the hetzner cloud server; see [drivers.Driver.Kill]
 func (d *Driver) Kill() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
@@ -721,19 +864,19 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 	return stype, nil
 }
 
-func (d *Driver) getRemoteKeyWithSameFingerprint(pubkey_byte []byte) (*hcloud.SSHKey, error) {
-	pubkey, _, _, _, err := ssh.ParseAuthorizedKey(pubkey_byte)
+func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud.SSHKey, error) {
+	publicKey, _, _, _, err := ssh.ParseAuthorizedKey(publicKeyBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not parse ssh public key")
 	}
 
-	fp := ssh.FingerprintLegacyMD5(pubkey)
+	fp := ssh.FingerprintLegacyMD5(publicKey)
 
-	remotekey, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
+	remoteKey, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
 	if err != nil {
-		return remotekey, errors.Wrap(err, "could not get sshkey by fingerprint")
+		return remoteKey, errors.Wrap(err, "could not get sshkey by fingerprint")
 	}
-	return remotekey, nil
+	return remoteKey, nil
 }
 
 func (d *Driver) getServerHandle() (*hcloud.Server, error) {
@@ -773,4 +916,102 @@ func (d *Driver) waitForAction(a *hcloud.Action) error {
 		time.Sleep(1 * time.Second)
 	}
 	return nil
+}
+
+func (d *Driver) labelName(name string) string {
+	return labelNamespace + "/" + name
+}
+
+func (d *Driver) getAutoPlacementGroup() (*hcloud.PlacementGroup, error) {
+	res, err := d.getClient().PlacementGroup.AllWithOpts(context.Background(), hcloud.PlacementGroupListOpts{
+		ListOpts: hcloud.ListOpts{LabelSelector: d.labelName(labelAutoSpreadPg)},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res) != 0 {
+		return res[0], nil
+	}
+
+	grp, err := d.makePlacementGroup("Docker-Machine auto spread", map[string]string{
+		d.labelName(labelAutoSpreadPg): "true",
+		d.labelName(labelAutoCreated):  "true",
+	})
+
+	return grp, err
+}
+
+func (d *Driver) makePlacementGroup(name string, labels map[string]string) (*hcloud.PlacementGroup, error) {
+	grp, _, err := d.getClient().PlacementGroup.Create(context.Background(), hcloud.PlacementGroupCreateOpts{
+		Name:   name,
+		Labels: labels,
+		Type:   "spread",
+	})
+
+	if grp.PlacementGroup != nil {
+		d.dangling = append(d.dangling, func() {
+			_, err := d.getClient().PlacementGroup.Delete(context.Background(), grp.PlacementGroup)
+			if err != nil {
+				log.Errorf("could not delete placement group: %v", err)
+			}
+		})
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create placement group: %w", err)
+	}
+
+	return grp.PlacementGroup, nil
+}
+
+func (d *Driver) getPlacementGroup() (*hcloud.PlacementGroup, error) {
+	if d.placementGroup == "" {
+		return nil, nil
+	} else if d.cachedPGrp != nil {
+		return d.cachedPGrp, nil
+	}
+
+	name := d.placementGroup
+	if name == autoSpreadPgName {
+		grp, err := d.getAutoPlacementGroup()
+		d.cachedPGrp = grp
+		return grp, err
+	} else {
+		client := d.getClient().PlacementGroup
+		grp, _, err := client.Get(context.Background(), name)
+		if err != nil {
+			return nil, fmt.Errorf("could not get placement group: %w", err)
+		}
+
+		if grp != nil {
+			return grp, nil
+		}
+
+		return d.makePlacementGroup(name, map[string]string{d.labelName(labelAutoCreated): "true"})
+	}
+}
+
+func (d *Driver) removeEmptyServerPlacementGroup(srv *hcloud.Server) error {
+	pg := srv.PlacementGroup
+	if pg == nil {
+		return nil
+	}
+
+	if len(pg.Servers) > 1 {
+		log.Debugf("more than 1 servers in group, ignoring %v", pg)
+		return nil
+	}
+
+	if auto, exists := pg.Labels[d.labelName(labelAutoCreated)]; exists && auto == "true" {
+		_, err := d.getClient().PlacementGroup.Delete(context.Background(), pg)
+		if err != nil {
+			return fmt.Errorf("could not remove placement group: %w", err)
+		}
+		return nil
+	} else {
+		log.Debugf("group not auto-created, ignoring: %v", pg)
+		return nil
+	}
 }

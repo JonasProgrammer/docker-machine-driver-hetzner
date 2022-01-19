@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.3.0/docker-machine-driver-hetzner_3.3.0_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.3.0_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.5.0/docker-machine-driver-hetzner_3.5.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_3.5.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -105,6 +105,9 @@ $ docker-machine create \
 - `--hetzner-use-private-network`: Use private network
 - `--hetzner-firewalls`: Firewall IDs or names which should be applied on the server
 - `--hetzner-server-label`: `key=value` pairs of additional metadata to assign to the server.
+- `--hetzner-key-label`: `key=value` pairs of additional metadata to assign to SSH key (only applies if newly creadted).
+- `--hetzner-placement-group`: Add to a placement group by name or ID; a spread-group will be created on demand if it does not exist
+- `--hetzner-auto-spread`: Add to a `docker-machine` provided `spread` group (mutually exclusive with `--hetzner-placement-group`)
 
 #### Existing SSH keys
 
@@ -125,21 +128,23 @@ was used during creation.
 
 | CLI option                          | Environment variable              | Default                    |
 | ----------------------------------- | --------------------------------- | -------------------------- |
-| **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               | -                          |
+| **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               |                            |
 | `--hetzner-image`                   | `HETZNER_IMAGE`                   | `ubuntu-18.04`             |
-| `--hetzner-image-id`                | `HETZNER_IMAGE_ID`                | -                          |
+| `--hetzner-image-id`                | `HETZNER_IMAGE_ID`                |                            |
 | `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
-| `--hetzner-server-location`         | `HETZNER_LOCATION`                | - *(let Hetzner choose)*   |
-| `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | - *(generate new keypair)* |
+| `--hetzner-server-location`         | `HETZNER_LOCATION`                | *(let Hetzner choose)*     |
+| `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | *(generate new keypair)*   |
 | `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
-| `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         | -                          |
-| `--hetzner-user-data`               | `HETZNER_USER_DATA`               | -                          |
-| `--hetzner-networks`                | `HETZNER_NETWORKS`                | -                          |
-| `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               | -                          |
-| `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 | -                          |
+| `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         |                            |
+| `--hetzner-user-data`               | `HETZNER_USER_DATA`               |                            |
+| `--hetzner-networks`                | `HETZNER_NETWORKS`                |                            |
+| `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               |                            |
+| `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 |                            |
 | `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
-| `--hetzner-server-label`            | `HETZNER_SERVER_LABELS`           | `[]`                       |
-
+| `--hetzner-server-label`            | (inoperative)                     | `[]`                       |
+| `--hetzner-key-label`               | (inoperative)                     | `[]`                       |
+| `--hetzner-placement-group`         | `HETZNER_PLACEMENT_GROUP`         |                            |
+| `--hetzner-auto-spread`             | `HETZNER_AUTO_SPREAD`             | false                      |
 
 ## Building from source
 
