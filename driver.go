@@ -76,11 +76,17 @@ const (
 	flagPlacementGroup    = "hetzner-placement-group"
 	flagAutoSpread        = "hetzner-auto-spread"
 
+	flagSshUser           = "hetzner-ssh-user"
+	flagSshPort           = "hetzner-ssh-port"
+	
 	labelNamespace    = "docker-machine"
 	labelAutoSpreadPg = "auto-spread"
 	labelAutoCreated  = "auto-created"
 
 	autoSpreadPgName = "__auto_spread"
+	
+	defaultSSHPort = 22
+	defaultSSHUser = "root"
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -90,8 +96,6 @@ func NewDriver() *Driver {
 		Type:          defaultType,
 		IsExistingKey: false,
 		BaseDriver: &drivers.BaseDriver{
-			SSHUser: drivers.DefaultSSHUser,
-			SSHPort: drivers.DefaultSSHPort,
 		},
 	}
 }
@@ -203,6 +207,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flagAutoSpread,
 			Usage:  "Auto-spread on a docker-machine-specific default placement group",
 		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_SSH_USER",
+			Name:   flagSshUser,
+			Usage:  "SSH username",
+			Value:  defaultSSHUser,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "HETZNER_SSH_PORT",
+			Name:   flagSshPort,
+			Usage:  "SSH port",
+			Value:  defaultSSHPort,
+		},
 	}
 }
 
@@ -224,6 +240,9 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.Firewalls = opts.StringSlice(flagFirewalls)
 	d.AdditionalKeys = opts.StringSlice(flagAdditionalKeys)
 
+	d.SSHUser = opts.String(flagSshUser)
+	d.SSHPort = opts.Int(flagSshPort)
+	
 	d.placementGroup = opts.String(flagPlacementGroup)
 	if opts.Bool(flagAutoSpread) {
 		if d.placementGroup != "" {
@@ -248,6 +267,14 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	}
 
 	return nil
+}
+
+func (d *Driver) GetSSHUsername() string {
+	return d.SSHUser
+}
+
+func (d *Driver) GetSSHPort() (int, error) {
+	return d.SSHPort, nil
 }
 
 func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {

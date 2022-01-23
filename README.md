@@ -108,6 +108,8 @@ $ docker-machine create \
 - `--hetzner-key-label`: `key=value` pairs of additional metadata to assign to SSH key (only applies if newly creadted).
 - `--hetzner-placement-group`: Add to a placement group by name or ID; a spread-group will be created on demand if it does not exist
 - `--hetzner-auto-spread`: Add to a `docker-machine` provided `spread` group (mutually exclusive with `--hetzner-placement-group`)
+- `--hetzner-ssh-user`: Change the default SSH-User
+- `--hetzner-ssh-port`: Change the default SSH-Port
 
 #### Existing SSH keys
 
@@ -145,6 +147,9 @@ was used during creation.
 | `--hetzner-key-label`               | (inoperative)                     | `[]`                       |
 | `--hetzner-placement-group`         | `HETZNER_PLACEMENT_GROUP`         |                            |
 | `--hetzner-auto-spread`             | `HETZNER_AUTO_SPREAD`             | false                      |
+| `--hetzner-ssh-user`                | `HETZNER_SSH_USER`                | root                       |
+| `--hetzner-ssh-port`                | `HETZNER_SSH_PORT`                | 22                         |
+
 
 ## Building from source
 
