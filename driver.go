@@ -76,15 +76,15 @@ const (
 	flagPlacementGroup    = "hetzner-placement-group"
 	flagAutoSpread        = "hetzner-auto-spread"
 
-	flagSshUser           = "hetzner-ssh-user"
-	flagSshPort           = "hetzner-ssh-port"
-	
+	flagSshUser = "hetzner-ssh-user"
+	flagSshPort = "hetzner-ssh-port"
+
 	labelNamespace    = "docker-machine"
 	labelAutoSpreadPg = "auto-spread"
 	labelAutoCreated  = "auto-created"
 
 	autoSpreadPgName = "__auto_spread"
-	
+
 	defaultSSHPort = 22
 	defaultSSHUser = "root"
 )
@@ -95,8 +95,7 @@ func NewDriver() *Driver {
 		Image:         defaultImage,
 		Type:          defaultType,
 		IsExistingKey: false,
-		BaseDriver: &drivers.BaseDriver{
-		},
+		BaseDriver:    &drivers.BaseDriver{},
 	}
 }
 
@@ -242,7 +241,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 
 	d.SSHUser = opts.String(flagSshUser)
 	d.SSHPort = opts.Int(flagSshPort)
-	
+
 	d.placementGroup = opts.String(flagPlacementGroup)
 	if opts.Bool(flagAutoSpread) {
 		if d.placementGroup != "" {
@@ -269,10 +268,12 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	return nil
 }
 
+// GetSSHUsername retrieves the SSH username used to connect to the server during provisioning
 func (d *Driver) GetSSHUsername() string {
 	return d.SSHUser
 }
 
+// GetSSHPort retrieves the port used to connect to the server during provisioning
 func (d *Driver) GetSSHPort() (int, error) {
 	return d.SSHPort, nil
 }
