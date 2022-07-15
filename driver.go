@@ -43,6 +43,8 @@ type Driver struct {
 	Volumes           []string
 	Networks          []string
 	UsePrivateNetwork bool
+	DisablePublic4    bool
+	DisablePublic6    bool
 	Firewalls         []string
 	ServerLabels      map[string]string
 	keyLabels         map[string]string
@@ -69,6 +71,9 @@ const (
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
+	flagDisablePublic4    = "hetzner-disable-public-4"
+	flagDisablePublic6    = "hetzner-disable-public-6"
+	flagDisablePublic     = "hetzner-disable-public"
 	flagFirewalls         = "hetzner-firewalls"
 	flagAdditionalKeys    = "hetzner-additional-key"
 	flagServerLabel       = "hetzner-server-label"
@@ -171,6 +176,21 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flagUsePrivateNetwork,
 			Usage:  "Use private network",
 		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_DISABLE_PUBLIC_4",
+			Name:   flagDisablePublic4,
+			Usage:  "Disable public ipv4",
+		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_DISABLE_PUBLIC_6",
+			Name:   flagDisablePublic6,
+			Usage:  "Disable public ipv6",
+		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_DISABLE_PUBLIC",
+			Name:   flagDisablePublic,
+			Usage:  "Disable public ip (v4 & v6)",
+		},
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_FIREWALLS",
 			Name:   flagFirewalls,
@@ -235,7 +255,10 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.userData = opts.String(flagUserData)
 	d.Volumes = opts.StringSlice(flagVolumes)
 	d.Networks = opts.StringSlice(flagNetworks)
-	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork)
+	disablePublic := opts.Bool(flagDisablePublic)
+	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork) || disablePublic
+	d.DisablePublic4 = opts.Bool(flagDisablePublic4) || disablePublic
+	d.DisablePublic6 = opts.Bool(flagDisablePublic6) || disablePublic
 	d.Firewalls = opts.StringSlice(flagFirewalls)
 	d.AdditionalKeys = opts.StringSlice(flagAdditionalKeys)
 
@@ -263,6 +286,11 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 
 	if d.ImageID != 0 && d.Image != defaultImage {
 		return errors.Errorf("--%v and --%v are mutually exclusive", flagImage, flagImageID)
+	}
+
+	if d.DisablePublic4 && d.DisablePublic6 && !d.UsePrivateNetwork {
+		return errors.Errorf("--%v must be used if public networking is disabled (hint: implicitly set by --%v)",
+			flagUsePrivateNetwork, flagDisablePublic)
 	}
 
 	return nil
@@ -415,6 +443,18 @@ func (d *Driver) configureNetworkAccess(srv hcloud.ServerCreateResult) error {
 			}
 			time.Sleep(1 * time.Second)
 		}
+	} else if d.DisablePublic4 {
+		log.Infof("Using public IPv6 network ...")
+
+		pv6 := srv.Server.PublicNet.IPv6
+		ip := pv6.IP
+		if ip.Mask(pv6.Network.Mask).Equal(pv6.Network.IP) { // no host given
+			ip[net.IPv6len-1] |= 0x01 // TODO make this configurable
+		}
+
+		ips := ip.String()
+		log.Infof(" -> resolved %v ...", ips)
+		d.IPAddress = ips
 	} else {
 		log.Infof("Using public network ...")
 		d.IPAddress = srv.Server.PublicNet.IPv4.IP.String()
@@ -449,6 +489,13 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 		UserData:       d.userData,
 		Labels:         d.ServerLabels,
 		PlacementGroup: pgrp,
+	}
+
+	if d.DisablePublic4 || d.DisablePublic6 {
+		srvopts.PublicNet = &hcloud.ServerCreatePublicNet{
+			EnableIPv4: !d.DisablePublic4,
+			EnableIPv6: !d.DisablePublic6,
+		}
 	}
 
 	networks, err := d.createNetworks()

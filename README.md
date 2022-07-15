@@ -128,28 +128,37 @@ was used during creation.
 
 #### Environment variables and default values
 
-| CLI option                          | Environment variable              | Default                    |
-| ----------------------------------- | --------------------------------- | -------------------------- |
-| **`--hetzner-api-token`**           | `HETZNER_API_TOKEN`               |                            |
-| `--hetzner-image`                   | `HETZNER_IMAGE`                   | `ubuntu-18.04`             |
-| `--hetzner-image-id`                | `HETZNER_IMAGE_ID`                |                            |
-| `--hetzner-server-type`             | `HETZNER_TYPE`                    | `cx11`                     |
-| `--hetzner-server-location`         | `HETZNER_LOCATION`                | *(let Hetzner choose)*     |
-| `--hetzner-existing-key-path`       | `HETZNER_EXISTING_KEY_PATH`       | *(generate new keypair)*   |
-| `--hetzner-existing-key-id`         | `HETZNER_EXISTING_KEY_ID`         | 0 *(upload new key)*       |
-| `--hetzner-additional-key`          | `HETZNER_ADDITIONAL_KEYS`         |                            |
-| `--hetzner-user-data`               | `HETZNER_USER_DATA`               |                            |
-| `--hetzner-networks`                | `HETZNER_NETWORKS`                |                            |
-| `--hetzner-firewalls`               | `HETZNER_FIREWALLS`               |                            |
-| `--hetzner-volumes`                 | `HETZNER_VOLUMES`                 |                            |
-| `--hetzner-use-private-network`     | `HETZNER_USE_PRIVATE_NETWORK`     | false                      |
-| `--hetzner-server-label`            | (inoperative)                     | `[]`                       |
-| `--hetzner-key-label`               | (inoperative)                     | `[]`                       |
-| `--hetzner-placement-group`         | `HETZNER_PLACEMENT_GROUP`         |                            |
-| `--hetzner-auto-spread`             | `HETZNER_AUTO_SPREAD`             | false                      |
-| `--hetzner-ssh-user`                | `HETZNER_SSH_USER`                | root                       |
-| `--hetzner-ssh-port`                | `HETZNER_SSH_PORT`                | 22                         |
+| CLI option                      | Environment variable          | Default                    |
+|---------------------------------|-------------------------------| -------------------------- |
+| **`--hetzner-api-token`**       | `HETZNER_API_TOKEN`           |                            |
+| `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-18.04`             |
+| `--hetzner-image-id`            | `HETZNER_IMAGE_ID`            |                            |
+| `--hetzner-server-type`         | `HETZNER_TYPE`                | `cx11`                     |
+| `--hetzner-server-location`     | `HETZNER_LOCATION`            | *(let Hetzner choose)*     |
+| `--hetzner-existing-key-path`   | `HETZNER_EXISTING_KEY_PATH`   | *(generate new keypair)*   |
+| `--hetzner-existing-key-id`     | `HETZNER_EXISTING_KEY_ID`     | 0 *(upload new key)*       |
+| `--hetzner-additional-key`      | `HETZNER_ADDITIONAL_KEYS`     |                            |
+| `--hetzner-user-data`           | `HETZNER_USER_DATA`           |                            |
+| `--hetzner-networks`            | `HETZNER_NETWORKS`            |                            |
+| `--hetzner-firewalls`           | `HETZNER_FIREWALLS`           |                            |
+| `--hetzner-volumes`             | `HETZNER_VOLUMES`             |                            |
+| `--hetzner-use-private-network` | `HETZNER_USE_PRIVATE_NETWORK` | false                      |
+| `--hetzner-disable-public-4`    | `HETZNER_DISABLE_PUBLIC_4`    | false                      |
+| `--hetzner-disable-public-6`    | `HETZNER_DISABLE_PUBLIC_6`    | false                      |
+| `--hetzner-disable-public`      | `HETZNER_DISABLE_PUBLIC`      | false                      |
+| `--hetzner-server-label`        | (inoperative)                 | `[]`                       |
+| `--hetzner-key-label`           | (inoperative)                 | `[]`                       |
+| `--hetzner-placement-group`     | `HETZNER_PLACEMENT_GROUP`     |                            |
+| `--hetzner-auto-spread`         | `HETZNER_AUTO_SPREAD`         | false                      |
+| `--hetzner-ssh-user`            | `HETZNER_SSH_USER`            | root                       |
+| `--hetzner-ssh-port`            | `HETZNER_SSH_PORT`            | 22                         |
 
+**Networking hint:** When disabling all public IPs, `--hetzner-use-private-network` must be given.
+`--hetzner-disable-public` will take care of that, and behaves as if
+`--hetzner-disable-public-4 --hetzner-disable-public-6 --hetzner-use-private-network`
+were given.
+Using `--hetzner-use-private-network` implicitly or explicitly requires at least one `--hetzner-network`
+to be given.
 
 ## Building from source
 
