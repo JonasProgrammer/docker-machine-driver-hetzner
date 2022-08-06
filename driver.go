@@ -97,7 +97,6 @@ const (
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
 func NewDriver() *Driver {
 	return &Driver{
-		Image:         defaultImage,
 		Type:          defaultType,
 		IsExistingKey: false,
 		BaseDriver:    &drivers.BaseDriver{},
@@ -122,7 +121,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "HETZNER_IMAGE",
 			Name:   flagImage,
 			Usage:  "Image to use for server creation",
-			Value:  defaultImage,
+			Value:  "",
 		},
 		mcnflag.IntFlag{
 			EnvVar: "HETZNER_IMAGE_ID",
@@ -284,8 +283,10 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 		return errors.Errorf("hetzner requires --%v to be set", flagAPIToken)
 	}
 
-	if d.ImageID != 0 && d.Image != defaultImage {
+	if d.ImageID != 0 && d.Image != "" {
 		return errors.Errorf("--%v and --%v are mutually exclusive", flagImage, flagImageID)
+	} else if d.ImageID == 0 && d.Image == "" {
+		d.Image = defaultImage
 	}
 
 	if d.DisablePublic4 && d.DisablePublic6 && !d.UsePrivateNetwork {
