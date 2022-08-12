@@ -283,7 +283,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 		return errors.Errorf("hetzner requires --%v to be set", flagAPIToken)
 	}
 
-	if d.ImageID != 0 && d.Image != "" {
+	if d.ImageID != 0 && d.Image != "" && d.Image != defaultImage /* support legacy behaviour */ {
 		return errors.Errorf("--%v and --%v are mutually exclusive", flagImage, flagImageID)
 	} else if d.ImageID == 0 && d.Image == "" {
 		d.Image = defaultImage
