@@ -243,6 +243,10 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 // SetConfigFromFlags handles additional driver arguments as retrieved by [Driver.GetCreateFlags];
 // see [drivers.Driver.SetConfigFromFlags]
 func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
+	return d.setConfigFromFlags(opts)
+}
+
+func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
 	d.ImageID = opts.Int(flagImageID)
@@ -267,7 +271,7 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.placementGroup = opts.String(flagPlacementGroup)
 	if opts.Bool(flagAutoSpread) {
 		if d.placementGroup != "" {
-			return errors.Errorf(flagAutoSpread + " and " + flagPlacementGroup + " are mutually exclusive")
+			return d.flagFailure("%v and %v are mutually exclusive", flagAutoSpread, flagPlacementGroup)
 		}
 		d.placementGroup = autoSpreadPgName
 	}
@@ -280,17 +284,17 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.SetSwarmConfigFromFlags(opts)
 
 	if d.AccessToken == "" {
-		return errors.Errorf("hetzner requires --%v to be set", flagAPIToken)
+		return d.flagFailure("hetzner requires --%v to be set", flagAPIToken)
 	}
 
 	if d.ImageID != 0 && d.Image != "" && d.Image != defaultImage /* support legacy behaviour */ {
-		return errors.Errorf("--%v and --%v are mutually exclusive", flagImage, flagImageID)
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagImage, flagImageID)
 	} else if d.ImageID == 0 && d.Image == "" {
 		d.Image = defaultImage
 	}
 
 	if d.DisablePublic4 && d.DisablePublic6 && !d.UsePrivateNetwork {
-		return errors.Errorf("--%v must be used if public networking is disabled (hint: implicitly set by --%v)",
+		return d.flagFailure("--%v must be used if public networking is disabled (hint: implicitly set by --%v)",
 			flagUsePrivateNetwork, flagDisablePublic)
 	}
 
@@ -312,7 +316,7 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 	for _, label := range opts.StringSlice(flagServerLabel) {
 		split := strings.SplitN(label, "=", 2)
 		if len(split) != 2 {
-			return errors.Errorf("server label %v is not in key=value format", label)
+			return d.flagFailure("server label %v is not in key=value format", label)
 		}
 		d.ServerLabels[split[0]] = split[1]
 	}
@@ -331,7 +335,7 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 func (d *Driver) PreCreateCheck() error {
 	if d.IsExistingKey {
 		if d.originalKey == "" {
-			return errors.New("specifying an existing key ID requires the existing key path to be set as well")
+			return d.flagFailure("specifying an existing key ID requires the existing key path to be set as well")
 		}
 
 		key, err := d.getKey()
