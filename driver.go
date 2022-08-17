@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -343,7 +342,7 @@ func (d *Driver) PreCreateCheck() error {
 			return errors.Wrap(err, "could not get key")
 		}
 
-		buf, err := ioutil.ReadFile(d.originalKey + ".pub")
+		buf, err := os.ReadFile(d.originalKey + ".pub")
 		if err != nil {
 			return errors.Wrap(err, "could not read public key")
 		}
@@ -587,7 +586,7 @@ func (d *Driver) createRemoteKeys() error {
 	if d.KeyID == 0 {
 		log.Infof("Creating SSH key...")
 
-		buf, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
+		buf, err := os.ReadFile(d.GetSSHKeyPath() + ".pub")
 		if err != nil {
 			return errors.Wrap(err, "could not read ssh public key")
 		}
