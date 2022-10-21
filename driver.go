@@ -44,6 +44,10 @@ type Driver struct {
 	UsePrivateNetwork bool
 	DisablePublic4    bool
 	DisablePublic6    bool
+	PrimaryIPv4       string
+	cachedPrimaryIPv4 *hcloud.PrimaryIP
+	PrimaryIPv6       string
+	cachedPrimaryIPv6 *hcloud.PrimaryIP
 	Firewalls         []string
 	ServerLabels      map[string]string
 	keyLabels         map[string]string
@@ -72,6 +76,8 @@ const (
 	flagUsePrivateNetwork = "hetzner-use-private-network"
 	flagDisablePublic4    = "hetzner-disable-public-4"
 	flagDisablePublic6    = "hetzner-disable-public-6"
+	flagPrimary4          = "hetzner-primary-ipv4"
+	flagPrimary6          = "hetzner-primary-ipv6"
 	flagDisablePublic     = "hetzner-disable-public"
 	flagFirewalls         = "hetzner-firewalls"
 	flagAdditionalKeys    = "hetzner-additional-key"
@@ -189,6 +195,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flagDisablePublic,
 			Usage:  "Disable public ip (v4 & v6)",
 		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_PRIMARY_IPV4",
+			Name:   flagPrimary4,
+			Usage:  "Existing primary IPv4 address",
+			Value:  "",
+		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_PRIMARY_IPV6",
+			Name:   flagPrimary6,
+			Usage:  "Existing primary IPv6 address",
+			Value:  "",
+		},
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_FIREWALLS",
 			Name:   flagFirewalls,
@@ -261,6 +279,8 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork) || disablePublic
 	d.DisablePublic4 = opts.Bool(flagDisablePublic4) || disablePublic
 	d.DisablePublic6 = opts.Bool(flagDisablePublic6) || disablePublic
+	d.PrimaryIPv4 = opts.String(flagPrimary4)
+	d.PrimaryIPv6 = opts.String(flagPrimary6)
 	d.Firewalls = opts.StringSlice(flagFirewalls)
 	d.AdditionalKeys = opts.StringSlice(flagAdditionalKeys)
 
@@ -295,6 +315,14 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	if d.DisablePublic4 && d.DisablePublic6 && !d.UsePrivateNetwork {
 		return d.flagFailure("--%v must be used if public networking is disabled (hint: implicitly set by --%v)",
 			flagUsePrivateNetwork, flagDisablePublic)
+	}
+
+	if d.DisablePublic4 && d.PrimaryIPv4 != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagPrimary4, flagDisablePublic4)
+	}
+
+	if d.DisablePublic6 && d.PrimaryIPv6 != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagPrimary6, flagDisablePublic6)
 	}
 
 	return nil
@@ -373,6 +401,14 @@ func (d *Driver) PreCreateCheck() error {
 
 	if _, err := d.getPlacementGroup(); err != nil {
 		return fmt.Errorf("could not create placement group: %w", err)
+	}
+
+	if _, err := d.getPrimaryIPv4(); err != nil {
+		return fmt.Errorf("could not resolve primary IPv4: %w", err)
+	}
+
+	if _, err := d.getPrimaryIPv6(); err != nil {
+		return fmt.Errorf("could not resolve primary IPv6: %w", err)
 	}
 
 	if d.UsePrivateNetwork && len(d.Networks) == 0 {
@@ -495,11 +531,9 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 		PlacementGroup: pgrp,
 	}
 
-	if d.DisablePublic4 || d.DisablePublic6 {
-		srvopts.PublicNet = &hcloud.ServerCreatePublicNet{
-			EnableIPv4: !d.DisablePublic4,
-			EnableIPv6: !d.DisablePublic6,
-		}
+	err = d.setPublicNetIfRequired(srvopts)
+	if err != nil {
+		return nil, err
 	}
 
 	networks, err := d.createNetworks()
@@ -535,6 +569,27 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 	}
 	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
 	return &srvopts, nil
+}
+
+func (d *Driver) setPublicNetIfRequired(srvopts hcloud.ServerCreateOpts) error {
+	pip4, err := d.getPrimaryIPv4()
+	if err != nil {
+		return err
+	}
+	pip6, err := d.getPrimaryIPv6()
+	if err != nil {
+		return err
+	}
+
+	if d.DisablePublic4 || d.DisablePublic6 || pip4 != nil || pip6 != nil {
+		srvopts.PublicNet = &hcloud.ServerCreatePublicNet{
+			EnableIPv4: !d.DisablePublic4,
+			EnableIPv6: !d.DisablePublic6,
+			IPv4:       pip4,
+			IPv6:       pip6,
+		}
+	}
+	return nil
 }
 
 func (d *Driver) createNetworks() ([]*hcloud.Network, error) {
@@ -1093,4 +1148,53 @@ func (d *Driver) removeEmptyServerPlacementGroup(srv *hcloud.Server) error {
 		log.Debugf("group not auto-created, ignoring: %v", pg)
 		return nil
 	}
+}
+
+func (d *Driver) getPrimaryIPv4() (*hcloud.PrimaryIP, error) {
+	raw := d.PrimaryIPv4
+	if raw == "" {
+		return nil, nil
+	} else if d.cachedPrimaryIPv4 != nil {
+		return d.cachedPrimaryIPv4, nil
+	}
+
+	ip, err := d.resolvePrimaryIP(raw)
+	d.cachedPrimaryIPv4 = ip
+	return ip, err
+}
+
+func (d *Driver) getPrimaryIPv6() (*hcloud.PrimaryIP, error) {
+	raw := d.PrimaryIPv6
+	if raw == "" {
+		return nil, nil
+	} else if d.cachedPrimaryIPv6 != nil {
+		return d.cachedPrimaryIPv6, nil
+	}
+
+	ip, err := d.resolvePrimaryIP(raw)
+	d.cachedPrimaryIPv6 = ip
+	return ip, err
+}
+
+func (d *Driver) resolvePrimaryIP(raw string) (*hcloud.PrimaryIP, error) {
+	client := d.getClient().PrimaryIP
+
+	var getter func(context.Context, string) (*hcloud.PrimaryIP, *hcloud.Response, error)
+	if net.ParseIP(raw) != nil {
+		getter = client.GetByIP
+	} else {
+		getter = client.Get
+	}
+
+	ip, _, err := getter(context.Background(), raw)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not get primary IP: %w", err)
+	}
+
+	if ip != nil {
+		return ip, nil
+	}
+
+	return nil, fmt.Errorf("primary IP not found: %v", raw)
 }
