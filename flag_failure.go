@@ -1,4 +1,4 @@
-//go:build !flag_debug
+//go:build !flag_debug && !instrumented
 
 package main
 

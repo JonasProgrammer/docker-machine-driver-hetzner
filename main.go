@@ -8,14 +8,15 @@ import (
 	"github.com/docker/machine/libmachine/drivers/plugin"
 )
 
-// Version will be added once we start the build process via travis-ci
-var Version string
+// Version will be added once we start the build process by goreleaser
+var version string
 
 func main() {
-	version := flag.Bool("v", false, "prints current docker-machine-driver-hetzner version")
+	versionFlag := flag.Bool("v", false, "prints current docker-machine-driver-hetzner version")
 	flag.Parse()
-	if *version {
-		fmt.Printf("Version: %s\n", Version)
+	instrumented("sadf")
+	if *versionFlag {
+		fmt.Printf("Version: %s\n", version)
 		os.Exit(0)
 	}
 	plugin.RegisterDriver(NewDriver())

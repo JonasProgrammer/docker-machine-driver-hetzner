@@ -325,6 +325,8 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 		return d.flagFailure("--%v and --%v are mutually exclusive", flagPrimary6, flagDisablePublic6)
 	}
 
+	instrumented(d)
+
 	return nil
 }
 
@@ -438,7 +440,7 @@ func (d *Driver) Create() error {
 		return err
 	}
 
-	srv, _, err := d.getClient().Server.Create(context.Background(), *srvopts)
+	srv, _, err := d.getClient().Server.Create(context.Background(), instrumented(*srvopts))
 	if err != nil {
 		return errors.Wrap(err, "could not create server")
 	}
@@ -531,7 +533,7 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 		PlacementGroup: pgrp,
 	}
 
-	err = d.setPublicNetIfRequired(srvopts)
+	err = d.setPublicNetIfRequired(&srvopts)
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +573,7 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 	return &srvopts, nil
 }
 
-func (d *Driver) setPublicNetIfRequired(srvopts hcloud.ServerCreateOpts) error {
+func (d *Driver) setPublicNetIfRequired(srvopts *hcloud.ServerCreateOpts) error {
 	pip4, err := d.getPrimaryIPv4()
 	if err != nil {
 		return err
@@ -583,8 +585,8 @@ func (d *Driver) setPublicNetIfRequired(srvopts hcloud.ServerCreateOpts) error {
 
 	if d.DisablePublic4 || d.DisablePublic6 || pip4 != nil || pip6 != nil {
 		srvopts.PublicNet = &hcloud.ServerCreatePublicNet{
-			EnableIPv4: !d.DisablePublic4,
-			EnableIPv6: !d.DisablePublic6,
+			EnableIPv4: !d.DisablePublic4 || pip4 != nil,
+			EnableIPv6: !d.DisablePublic6 || pip6 != nil,
 			IPv4:       pip4,
 			IPv6:       pip6,
 		}
@@ -604,7 +606,7 @@ func (d *Driver) createNetworks() ([]*hcloud.Network, error) {
 		}
 		networks = append(networks, network)
 	}
-	return networks, nil
+	return instrumented(networks), nil
 }
 
 func (d *Driver) createFirewalls() ([]*hcloud.ServerCreateFirewall, error) {
@@ -619,7 +621,7 @@ func (d *Driver) createFirewalls() ([]*hcloud.ServerCreateFirewall, error) {
 		}
 		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
 	}
-	return firewalls, nil
+	return instrumented(firewalls), nil
 }
 
 func (d *Driver) createVolumes() ([]*hcloud.Volume, error) {
@@ -634,7 +636,7 @@ func (d *Driver) createVolumes() ([]*hcloud.Volume, error) {
 		}
 		volumes = append(volumes, volume)
 	}
-	return volumes, nil
+	return instrumented(volumes), nil
 }
 
 func (d *Driver) createRemoteKeys() error {
@@ -711,7 +713,7 @@ func (d *Driver) makeKey(name string, pubkey string, labels map[string]string) (
 		Labels:    labels,
 	}
 
-	key, _, err := d.getClient().SSHKey.Create(context.Background(), keyopts)
+	key, _, err := d.getClient().SSHKey.Create(context.Background(), instrumented(keyopts))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create ssh key")
 	} else if key == nil {
@@ -916,7 +918,7 @@ func (d *Driver) Kill() error {
 }
 
 func (d *Driver) getClient() *hcloud.Client {
-	return hcloud.NewClient(hcloud.WithToken(d.AccessToken), hcloud.WithApplication("docker-machine-driver", Version))
+	return hcloud.NewClient(hcloud.WithToken(d.AccessToken), hcloud.WithApplication("docker-machine-driver", version))
 }
 
 func (d *Driver) copySSHKeyPair(src string) error {
@@ -958,7 +960,7 @@ func (d *Driver) getType() (*hcloud.ServerType, error) {
 		return stype, errors.Wrap(err, "could not get type by name")
 	}
 	d.cachedType = stype
-	return stype, nil
+	return instrumented(stype), nil
 }
 
 func (d *Driver) getImage() (*hcloud.Image, error) {
@@ -982,7 +984,7 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 	}
 
 	d.cachedImage = image
-	return image, nil
+	return instrumented(image), nil
 }
 
 func (d *Driver) getKey() (*hcloud.SSHKey, error) {
@@ -995,7 +997,7 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 		return stype, errors.Wrap(err, "could not get sshkey by ID")
 	}
 	d.cachedKey = stype
-	return stype, nil
+	return instrumented(stype), nil
 }
 
 func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud.SSHKey, error) {
@@ -1010,7 +1012,7 @@ func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud
 	if err != nil {
 		return remoteKey, errors.Wrap(err, "could not get sshkey by fingerprint")
 	}
-	return remoteKey, nil
+	return instrumented(remoteKey), nil
 }
 
 func (d *Driver) getServerHandle() (*hcloud.Server, error) {
@@ -1074,15 +1076,15 @@ func (d *Driver) getAutoPlacementGroup() (*hcloud.PlacementGroup, error) {
 		d.labelName(labelAutoCreated):  "true",
 	})
 
-	return grp, err
+	return instrumented(grp), err
 }
 
 func (d *Driver) makePlacementGroup(name string, labels map[string]string) (*hcloud.PlacementGroup, error) {
-	grp, _, err := d.getClient().PlacementGroup.Create(context.Background(), hcloud.PlacementGroupCreateOpts{
+	grp, _, err := d.getClient().PlacementGroup.Create(context.Background(), instrumented(hcloud.PlacementGroupCreateOpts{
 		Name:   name,
 		Labels: labels,
 		Type:   "spread",
-	})
+	}))
 
 	if grp.PlacementGroup != nil {
 		d.dangling = append(d.dangling, func() {
@@ -1097,7 +1099,7 @@ func (d *Driver) makePlacementGroup(name string, labels map[string]string) (*hcl
 		return nil, fmt.Errorf("could not create placement group: %w", err)
 	}
 
-	return grp.PlacementGroup, nil
+	return instrumented(grp.PlacementGroup), nil
 }
 
 func (d *Driver) getPlacementGroup() (*hcloud.PlacementGroup, error) {
@@ -1193,7 +1195,7 @@ func (d *Driver) resolvePrimaryIP(raw string) (*hcloud.PrimaryIP, error) {
 	}
 
 	if ip != nil {
-		return ip, nil
+		return instrumented(ip), nil
 	}
 
 	return nil, fmt.Errorf("primary IP not found: %v", raw)
