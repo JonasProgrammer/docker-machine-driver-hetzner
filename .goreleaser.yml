@@ -1,19 +1,16 @@
 builds:
-  - goos:
+  - goos: &default-goos
       - darwin
       - linux
       - windows
-    goarch:
+    goarch: &default-arch
       - amd64
       - arm64
     env: &default-env
       - CGO_ENABLED=0
   - id: instrumented
-    goos:
-      - linux
-      - windows
-    goarch:
-      - amd64
+    goos: *default-goos
+    goarch: *default-arch
     env: *default-env
     tags: instrumented
     binary: docker-machine-driver-hetzner_instrumented
