@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	ioutil "io/ioutil"
 
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
@@ -39,6 +40,7 @@ type Driver struct {
 	ServerID          int
 	cachedServer      *hcloud.Server
 	userData          string
+	userDataFromFile  bool
 	Volumes           []string
 	Networks          []string
 	UsePrivateNetwork bool
@@ -71,6 +73,7 @@ const (
 	flagExKeyID           = "hetzner-existing-key-id"
 	flagExKeyPath         = "hetzner-existing-key-path"
 	flagUserData          = "hetzner-user-data"
+	flagUserDataFromFile  = "hetzner-user-data-from-file"
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
@@ -162,6 +165,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flagUserData,
 			Usage:  "Cloud-init based User data",
 			Value:  "",
+		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_USER_DATA_FROM_FILE",
+			Name:   flagUserDataFromFile,
+			Usage:  "Cloud-init based User data is file",
 		},
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_VOLUMES",
@@ -273,6 +281,7 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 	d.userData = opts.String(flagUserData)
+	d.userDataFromFile = opts.Bool(flagUserDataFromFile)
 	d.Volumes = opts.StringSlice(flagVolumes)
 	d.Networks = opts.StringSlice(flagNetworks)
 	disablePublic := opts.Bool(flagDisablePublic)
@@ -526,9 +535,19 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 		return nil, err
 	}
 
+	UserData := d.userData
+
+	if d.userDataFromFile == true {
+		readUserData, err := ioutil.ReadFile(d.userData)
+		if err != nil {
+			return nil, err
+		}
+		UserData = string(readUserData)
+	}
+
 	srvopts := hcloud.ServerCreateOpts{
 		Name:           d.GetMachineName(),
-		UserData:       d.userData,
+		UserData:       UserData,
 		Labels:         d.ServerLabels,
 		PlacementGroup: pgrp,
 	}

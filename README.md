@@ -100,6 +100,7 @@ $ docker-machine create \
   see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
 - `--hetzner-additional-key`: Upload an additional public key associated with the server, or associate an existing one with the same fingerprint. Can be specified multiple times.
 - `--hetzner-user-data`: Cloud-init based User data
+- `--hetzner-user-data-from-file`: Use Cloud-init based User data as file, `--hetzner-user-data` as file name
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
 - `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
 - `--hetzner-use-private-network`: Use private network
