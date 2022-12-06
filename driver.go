@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	ioutil "io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -594,7 +593,7 @@ func (d *Driver) getUserData() (string, error) {
 		return userData, nil
 	}
 
-	readUserData, err := ioutil.ReadFile(d.userData)
+	readUserData, err := os.ReadFile(d.userData)
 	if err != nil {
 		return "", err
 	}
