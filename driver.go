@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	ioutil "io/ioutil"
 	"net"
 	"os"
 	"strings"
 	"time"
-	ioutil "io/ioutil"
 
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
@@ -535,19 +535,14 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 		return nil, err
 	}
 
-	UserData := d.userData
-
-	if d.userDataFromFile == true {
-		readUserData, err := ioutil.ReadFile(d.userData)
-		if err != nil {
-			return nil, err
-		}
-		UserData = string(readUserData)
+	userData, err := d.getUserData()
+	if err != nil {
+		return nil, err
 	}
 
 	srvopts := hcloud.ServerCreateOpts{
 		Name:           d.GetMachineName(),
-		UserData:       UserData,
+		UserData:       userData,
 		Labels:         d.ServerLabels,
 		PlacementGroup: pgrp,
 	}
@@ -590,6 +585,20 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 	}
 	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
 	return &srvopts, nil
+}
+
+func (d *Driver) getUserData() (string, error) {
+	userData := d.userData
+
+	if !d.userDataFromFile {
+		return userData, nil
+	}
+
+	readUserData, err := ioutil.ReadFile(d.userData)
+	if err != nil {
+		return "", err
+	}
+	return string(readUserData), nil
 }
 
 func (d *Driver) setPublicNetIfRequired(srvopts *hcloud.ServerCreateOpts) error {
