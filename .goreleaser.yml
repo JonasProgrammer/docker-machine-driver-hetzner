@@ -8,9 +8,9 @@ builds:
       - arm64
     env: &default-env
       - CGO_ENABLED=0
-  - id: instrumented
-    goos: *default-goos
-    goarch: *default-arch
-    env: *default-env
-    tags: instrumented
-    binary: docker-machine-driver-hetzner_instrumented
+  #- id: instrumented
+  #  goos: *default-goos
+  #  goarch: *default-arch
+  #  env: *default-env
+  #  tags: instrumented
+  #  binary: docker-machine-driver-hetzner_instrumented
