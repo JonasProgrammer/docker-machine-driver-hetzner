@@ -58,6 +58,8 @@ type Driver struct {
 	AdditionalKeys       []string
 	AdditionalKeyIDs     []int
 	cachedAdditionalKeys []*hcloud.SSHKey
+
+	WaitOnError int
 }
 
 const (
@@ -99,6 +101,9 @@ const (
 
 	defaultSSHPort = 22
 	defaultSSHUser = "root"
+
+	flagWaitOnError    = "wait-on-error"
+	defaultWaitOnError = 0
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -261,6 +266,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "SSH port",
 			Value:  defaultSSHPort,
 		},
+		mcnflag.IntFlag{
+			EnvVar: "WAIT_ON_ERROR",
+			Name:   flagWaitOnError,
+			Usage:  "Wait if an error happens while creating the server",
+			Value:  defaultWaitOnError,
+		},
 	}
 }
 
@@ -294,6 +305,8 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 
 	d.SSHUser = opts.String(flagSshUser)
 	d.SSHPort = opts.Int(flagSshPort)
+
+	d.WaitOnError = opts.Int(flagWaitOnError)
 
 	d.placementGroup = opts.String(flagPlacementGroup)
 	if opts.Bool(flagAutoSpread) {
@@ -450,6 +463,7 @@ func (d *Driver) Create() error {
 
 	srv, _, err := d.getClient().Server.Create(context.Background(), instrumented(*srvopts))
 	if err != nil {
+		time.Sleep(time.Duration(d.WaitOnError) * time.Second)
 		return errors.Wrap(err, "could not create server")
 	}
 
