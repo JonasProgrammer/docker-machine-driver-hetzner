@@ -39,7 +39,7 @@ type Driver struct {
 	ServerID          int
 	cachedServer      *hcloud.Server
 	userData          string
-	userDataFromFile  bool
+	userDataFile      string
 	Volumes           []string
 	Networks          []string
 	UsePrivateNetwork bool
@@ -74,7 +74,7 @@ const (
 	flagExKeyID           = "hetzner-existing-key-id"
 	flagExKeyPath         = "hetzner-existing-key-path"
 	flagUserData          = "hetzner-user-data"
-	flagUserDataFromFile  = "hetzner-user-data-from-file"
+	flagUserDataFile      = "hetzner-user-data-file"
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
@@ -104,6 +104,8 @@ const (
 
 	flagWaitOnError    = "wait-on-error"
 	defaultWaitOnError = 0
+
+	legacyFlagUserDataFromFile = "hetzner-user-data-from-file"
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -167,13 +169,19 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_USER_DATA",
 			Name:   flagUserData,
-			Usage:  "Cloud-init based User data",
+			Usage:  "Cloud-init based user data (inline).",
 			Value:  "",
 		},
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_USER_DATA_FROM_FILE",
-			Name:   flagUserDataFromFile,
-			Usage:  "Cloud-init based User data is file",
+			Name:   legacyFlagUserDataFromFile,
+			Usage:  "DEPRECATED, use --hetzner-user-data-file. Treat --hetzner-user-data argument as filename.",
+		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_USER_DATA_FILE",
+			Name:   flagUserDataFile,
+			Usage:  "Cloud-init based user data (read from file)",
+			Value:  "",
 		},
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_VOLUMES",
@@ -290,8 +298,10 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.KeyID = opts.Int(flagExKeyID)
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
-	d.userData = opts.String(flagUserData)
-	d.userDataFromFile = opts.Bool(flagUserDataFromFile)
+	err := d.setUserDataFlags(opts)
+	if err != nil {
+		return err
+	}
 	d.Volumes = opts.StringSlice(flagVolumes)
 	d.Networks = opts.StringSlice(flagNetworks)
 	disablePublic := opts.Bool(flagDisablePublic)
@@ -316,7 +326,7 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 		d.placementGroup = autoSpreadPgName
 	}
 
-	err := d.setLabelsFromFlags(opts)
+	err = d.setLabelsFromFlags(opts)
 	if err != nil {
 		return err
 	}
@@ -347,6 +357,30 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	}
 
 	instrumented(d)
+
+	return nil
+}
+
+func (d *Driver) setUserDataFlags(opts drivers.DriverOptions) error {
+	userData := opts.String(flagUserData)
+	userDataFile := opts.String(flagUserDataFile)
+
+	if opts.Bool(legacyFlagUserDataFromFile) {
+		if userDataFile != "" {
+			return d.flagFailure("--%v and --%v are mutually exclusive", flagUserDataFile, legacyFlagUserDataFromFile)
+		}
+
+		log.Warnf("--%v is deprecated, pass '--%v \"%v\"'", legacyFlagUserDataFromFile, flagUserDataFile, userData)
+		d.userDataFile = userData
+		return nil
+	}
+
+	d.userData = userData
+	d.userDataFile = userDataFile
+
+	if d.userData != "" && d.userDataFile != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagUserData, flagUserDataFile)
+	}
 
 	return nil
 }
@@ -601,13 +635,12 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 }
 
 func (d *Driver) getUserData() (string, error) {
-	userData := d.userData
-
-	if !d.userDataFromFile {
-		return userData, nil
+	file := d.userDataFile
+	if file == "" {
+		return d.userData, nil
 	}
 
-	readUserData, err := os.ReadFile(d.userData)
+	readUserData, err := os.ReadFile(file)
 	if err != nil {
 		return "", err
 	}

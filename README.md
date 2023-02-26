@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.11.0/docker-machine-driver-hetzner_3.11.0_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.11.0_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.12.0/docker-machine-driver-hetzner_3.12.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_3.12.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -99,8 +99,9 @@ $ docker-machine create \
 - `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
   see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
 - `--hetzner-additional-key`: Upload an additional public key associated with the server, or associate an existing one with the same fingerprint. Can be specified multiple times.
-- `--hetzner-user-data`: Cloud-init based User data
-- `--hetzner-user-data-from-file`: Use Cloud-init based User data as file, `--hetzner-user-data` as file name
+- `--hetzner-user-data`: Cloud-init based data, passed inline as-is.
+- `--hetzner-user-data-file`: Cloud-init based data, read from passed file.
+- `--hetzner-user-data-from-file`: DEPRECATED, use `--hetzner-user-data-file`. Read `--hetzner-user-data` as file name and use contents as user-data.
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
 - `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
 - `--hetzner-use-private-network`: Use private network
@@ -142,6 +143,7 @@ was used during creation.
 | `--hetzner-existing-key-id`     | `HETZNER_EXISTING_KEY_ID`     | 0 *(upload new key)*       |
 | `--hetzner-additional-key`      | `HETZNER_ADDITIONAL_KEYS`     |                            |
 | `--hetzner-user-data`           | `HETZNER_USER_DATA`           |                            |
+| `--hetzner-user-data-file`      | `HETZNER_USER_DATA_FILE`      |                            |
 | `--hetzner-networks`            | `HETZNER_NETWORKS`            |                            |
 | `--hetzner-firewalls`           | `HETZNER_FIREWALLS`           |                            |
 | `--hetzner-volumes`             | `HETZNER_VOLUMES`             |                            |
@@ -229,3 +231,13 @@ $ export PATH="$PATH:$GOBIN"
 # Make docker-machine output help including hetzner-specific options
 $ docker-machine create --driver hetzner
 ```
+
+## Upcoming breaking changes
+
+### 4.0.0
+
+* `--hetzner-user-data-from-file` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-flag-user-data-file` should be used instead.
+
+### 5.0.0
+
+* `--hetzner-user-data-from-file` will be removed entirely, including its fallback behavior
