@@ -113,7 +113,7 @@ $ docker-machine create \
 - `--hetzner-ssh-user`: Change the default SSH-User
 - `--hetzner-ssh-port`: Change the default SSH-Port
 - `--hetzner-primary-ipv4/6`: Sets an existing primary IP (v4 or v6 respectively) for the server, as documented in [Networking](#networking)
-- `--wait-on-error`: Amount of seconds to wait on server creation failure (0/no wait by default)
+- `--hetzner-wait-on-error`: Amount of seconds to wait on server creation failure (0/no wait by default)
 
 #### Existing SSH keys
 
@@ -159,7 +159,7 @@ was used during creation.
 | `--hetzner-ssh-port`            | `HETZNER_SSH_PORT`            | 22                         |
 | `--hetzner-primary-ipv4`        | `HETZNER_PRIMARY_IPV4`        |                            |
 | `--hetzner-primary-ipv6`        | `HETZNER_PRIMARY_IPV6`        |                            |
-| `--wait-on-error`               | `WAIT_ON_ERROR`               | 0                          |
+| `--hetzner-wait-on-error`       | `HETZNER_WAIT_ON_ERROR`       | 0                          |
 
 #### Networking
 
