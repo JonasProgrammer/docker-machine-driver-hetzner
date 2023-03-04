@@ -102,7 +102,7 @@ const (
 	defaultSSHPort = 22
 	defaultSSHUser = "root"
 
-	flagWaitOnError    = "wait-on-error"
+	flagWaitOnError    = "hetzner-wait-on-error"
 	defaultWaitOnError = 0
 
 	legacyFlagUserDataFromFile = "hetzner-user-data-from-file"
@@ -275,7 +275,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Value:  defaultSSHPort,
 		},
 		mcnflag.IntFlag{
-			EnvVar: "WAIT_ON_ERROR",
+			EnvVar: "HETZNER_WAIT_ON_ERROR",
 			Name:   flagWaitOnError,
 			Usage:  "Wait if an error happens while creating the server",
 			Value:  defaultWaitOnError,
