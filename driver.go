@@ -78,8 +78,8 @@ const (
 	flagVolumes           = "hetzner-volumes"
 	flagNetworks          = "hetzner-networks"
 	flagUsePrivateNetwork = "hetzner-use-private-network"
-	flagDisablePublic4    = "hetzner-disable-public-4"
-	flagDisablePublic6    = "hetzner-disable-public-6"
+	flagDisablePublic4    = "hetzner-disable-public-ipv4"
+	flagDisablePublic6    = "hetzner-disable-public-ipv6"
 	flagPrimary4          = "hetzner-primary-ipv4"
 	flagPrimary6          = "hetzner-primary-ipv6"
 	flagDisablePublic     = "hetzner-disable-public"
@@ -201,12 +201,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Use private network",
 		},
 		mcnflag.BoolFlag{
-			EnvVar: "HETZNER_DISABLE_PUBLIC_4",
+			EnvVar: "HETZNER_DISABLE_PUBLIC_IPV4",
 			Name:   flagDisablePublic4,
 			Usage:  "Disable public ipv4",
 		},
 		mcnflag.BoolFlag{
-			EnvVar: "HETZNER_DISABLE_PUBLIC_6",
+			EnvVar: "HETZNER_DISABLE_PUBLIC_IPV6",
 			Name:   flagDisablePublic6,
 			Usage:  "Disable public ipv6",
 		},
