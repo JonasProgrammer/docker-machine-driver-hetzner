@@ -148,8 +148,8 @@ was used during creation.
 | `--hetzner-firewalls`           | `HETZNER_FIREWALLS`           |                            |
 | `--hetzner-volumes`             | `HETZNER_VOLUMES`             |                            |
 | `--hetzner-use-private-network` | `HETZNER_USE_PRIVATE_NETWORK` | false                      |
-| `--hetzner-disable-public-4`    | `HETZNER_DISABLE_PUBLIC_4`    | false                      |
-| `--hetzner-disable-public-6`    | `HETZNER_DISABLE_PUBLIC_6`    | false                      |
+| `--hetzner-disable-public-ipv4` | `HETZNER_DISABLE_PUBLIC_IPV4` | false                      |
+| `--hetzner-disable-public-ipv6` | `HETZNER_DISABLE_PUBLIC_IPV6` | false                      |
 | `--hetzner-disable-public`      | `HETZNER_DISABLE_PUBLIC`      | false                      |
 | `--hetzner-server-label`        | (inoperative)                 | `[]`                       |
 | `--hetzner-key-label`           | (inoperative)                 | `[]`                       |
@@ -177,7 +177,7 @@ Hetzner assigns them at the given time, so users should take care what retention
 
 When disabling all public IPs, `--hetzner-use-private-network` must be given.
 `--hetzner-disable-public` will take care of that, and behaves as if
-`--hetzner-disable-public-4 --hetzner-disable-public-6 --hetzner-use-private-network`
+`--hetzner-disable-public-ipv4 --hetzner-disable-public-ipv6 --hetzner-use-private-network`
 were given.
 Using `--hetzner-use-private-network` implicitly or explicitly requires at least one `--hetzner-network`
 to be given.
