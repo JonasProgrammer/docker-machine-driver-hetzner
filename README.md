@@ -107,7 +107,7 @@ $ docker-machine create \
 - `--hetzner-use-private-network`: Use private network
 - `--hetzner-firewalls`: Firewall IDs or names which should be applied on the server
 - `--hetzner-server-label`: `key=value` pairs of additional metadata to assign to the server.
-- `--hetzner-key-label`: `key=value` pairs of additional metadata to assign to SSH key (only applies if newly creadted).
+- `--hetzner-key-label`: `key=value` pairs of additional metadata to assign to SSH key (only applies if newly created).
 - `--hetzner-placement-group`: Add to a placement group by name or ID; a spread-group will be created on demand if it does not exist
 - `--hetzner-auto-spread`: Add to a `docker-machine` provided `spread` group (mutually exclusive with `--hetzner-placement-group`)
 - `--hetzner-ssh-user`: Change the default SSH-User
