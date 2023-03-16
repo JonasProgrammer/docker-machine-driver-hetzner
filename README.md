@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.12.1/docker-machine-driver-hetzner_3.12.1_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.12.1_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.12.2/docker-machine-driver-hetzner_3.12.2_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_3.12.2_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -148,8 +148,8 @@ was used during creation.
 | `--hetzner-firewalls`           | `HETZNER_FIREWALLS`           |                            |
 | `--hetzner-volumes`             | `HETZNER_VOLUMES`             |                            |
 | `--hetzner-use-private-network` | `HETZNER_USE_PRIVATE_NETWORK` | false                      |
-| `--hetzner-disable-public-4`    | `HETZNER_DISABLE_PUBLIC_4`    | false                      |
-| `--hetzner-disable-public-6`    | `HETZNER_DISABLE_PUBLIC_6`    | false                      |
+| `--hetzner-disable-public-ipv4` | `HETZNER_DISABLE_PUBLIC_IPV4` | false                      |
+| `--hetzner-disable-public-ipv6` | `HETZNER_DISABLE_PUBLIC_IPV6` | false                      |
 | `--hetzner-disable-public`      | `HETZNER_DISABLE_PUBLIC`      | false                      |
 | `--hetzner-server-label`        | (inoperative)                 | `[]`                       |
 | `--hetzner-key-label`           | (inoperative)                 | `[]`                       |
@@ -177,7 +177,7 @@ Hetzner assigns them at the given time, so users should take care what retention
 
 When disabling all public IPs, `--hetzner-use-private-network` must be given.
 `--hetzner-disable-public` will take care of that, and behaves as if
-`--hetzner-disable-public-4 --hetzner-disable-public-6 --hetzner-use-private-network`
+`--hetzner-disable-public-ipv4 --hetzner-disable-public-ipv6 --hetzner-use-private-network`
 were given.
 Using `--hetzner-use-private-network` implicitly or explicitly requires at least one `--hetzner-network`
 to be given.
@@ -237,7 +237,9 @@ $ docker-machine create --driver hetzner
 ### 4.0.0
 
 * `--hetzner-user-data-from-file` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-flag-user-data-file` should be used instead.
+* `--hetzner-disable-public-4`/`--hetzner-disable-public-6` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-disable-public-ipv4`/`--hetzner-disable-public-ipv6` should be used instead.
 
 ### 5.0.0
 
 * `--hetzner-user-data-from-file` will be removed entirely, including its fallback behavior
+* `--hetzner-disable-public-4`/`--hetzner-disable-public-6` ill be removed entirely, including their fallback behavior

@@ -46,7 +46,6 @@ func TestUserData(t *testing.T) {
 	d = NewDriver()
 	err = d.setConfigFromFlagsImpl(&commandstest.FakeFlagger{
 		Data: map[string]interface{}{
-			flagAPIToken:               "foo",
 			legacyFlagUserDataFromFile: true,
 			flagUserDataFile:           file,
 		},
@@ -56,7 +55,6 @@ func TestUserData(t *testing.T) {
 	// inline user data
 	d = NewDriver()
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
-		flagAPIToken: "foo",
 		flagUserData: inlineContents,
 	}))
 	if err != nil {
@@ -74,7 +72,6 @@ func TestUserData(t *testing.T) {
 	// file user data
 	d = NewDriver()
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
-		flagAPIToken:     "foo",
 		flagUserDataFile: file,
 	}))
 	if err != nil {
@@ -92,7 +89,6 @@ func TestUserData(t *testing.T) {
 	// legacy file user data
 	d = NewDriver()
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
-		flagAPIToken:               "foo",
 		flagUserData:               file,
 		legacyFlagUserDataFromFile: true,
 	}))
@@ -106,6 +102,108 @@ func TestUserData(t *testing.T) {
 	}
 	if data != fileContents {
 		t.Error("content did not match (legacy-file)")
+	}
+}
+
+func TestDisablePublic(t *testing.T) {
+	d := NewDriver()
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagDisablePublic: true,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if !d.DisablePublic4 {
+		t.Error("expected public ipv4 to be disabled")
+	}
+	if !d.DisablePublic6 {
+		t.Error("expected public ipv6 to be disabled")
+	}
+	if !d.UsePrivateNetwork {
+		t.Error("expected private network to be enabled")
+	}
+}
+
+func TestDisablePublic46(t *testing.T) {
+	d := NewDriver()
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagDisablePublic4: true,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if !d.DisablePublic4 {
+		t.Error("expected public ipv4 to be disabled")
+	}
+	if d.DisablePublic6 {
+		t.Error("public ipv6 disabled unexpectedly")
+	}
+	if d.UsePrivateNetwork {
+		t.Error("network enabled unexpectedly")
+	}
+
+	// 6
+	d = NewDriver()
+	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagDisablePublic6: true,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if d.DisablePublic4 {
+		t.Error("public ipv4 disabled unexpectedly")
+	}
+	if !d.DisablePublic6 {
+		t.Error("expected public ipv6 to be disabled")
+	}
+	if d.UsePrivateNetwork {
+		t.Error("network enabled unexpectedly")
+	}
+}
+
+func TestDisablePublic46Legacy(t *testing.T) {
+	d := NewDriver()
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		legacyFlagDisablePublic4: true,
+		// any truthy flag should take precedence
+		flagDisablePublic4: false,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if !d.DisablePublic4 {
+		t.Error("expected public ipv4 to be disabled")
+	}
+	if d.DisablePublic6 {
+		t.Error("public ipv6 disabled unexpectedly")
+	}
+	if d.UsePrivateNetwork {
+		t.Error("network enabled unexpectedly")
+	}
+
+	// 6
+	d = NewDriver()
+	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		legacyFlagDisablePublic6: true,
+		// any truthy flag should take precedence
+		flagDisablePublic6: false,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if d.DisablePublic4 {
+		t.Error("public ipv4 disabled unexpectedly")
+	}
+	if !d.DisablePublic6 {
+		t.Error("expected public ipv6 to be disabled")
+	}
+	if d.UsePrivateNetwork {
+		t.Error("network enabled unexpectedly")
 	}
 }
 
