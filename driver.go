@@ -106,6 +106,8 @@ const (
 	defaultWaitOnError = 0
 
 	legacyFlagUserDataFromFile = "hetzner-user-data-from-file"
+	legacyFlagDisablePublic4   = "hetzner-disable-public-4"
+	legacyFlagDisablePublic6   = "hetzner-disable-public-6"
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -206,9 +208,19 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Disable public ipv4",
 		},
 		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_DISABLE_PUBLIC_4",
+			Name:   legacyFlagDisablePublic4,
+			Usage:  "DEPRECATED, use --hetzner-disable-public-ipv4; disable public ipv4",
+		},
+		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_DISABLE_PUBLIC_IPV6",
 			Name:   flagDisablePublic6,
 			Usage:  "Disable public ipv6",
+		},
+		mcnflag.BoolFlag{
+			EnvVar: "HETZNER_DISABLE_PUBLIC_6",
+			Name:   legacyFlagDisablePublic6,
+			Usage:  "DEPRECATED, use --hetzner-disable-public-ipv6; disable public ipv6",
 		},
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_DISABLE_PUBLIC",
@@ -306,8 +318,8 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.Networks = opts.StringSlice(flagNetworks)
 	disablePublic := opts.Bool(flagDisablePublic)
 	d.UsePrivateNetwork = opts.Bool(flagUsePrivateNetwork) || disablePublic
-	d.DisablePublic4 = opts.Bool(flagDisablePublic4) || disablePublic
-	d.DisablePublic6 = opts.Bool(flagDisablePublic6) || disablePublic
+	d.DisablePublic4 = d.deprecatedBooleanFlag(opts, flagDisablePublic4, legacyFlagDisablePublic4) || disablePublic
+	d.DisablePublic6 = d.deprecatedBooleanFlag(opts, flagDisablePublic6, legacyFlagDisablePublic6) || disablePublic
 	d.PrimaryIPv4 = opts.String(flagPrimary4)
 	d.PrimaryIPv6 = opts.String(flagPrimary6)
 	d.Firewalls = opts.StringSlice(flagFirewalls)
@@ -359,6 +371,14 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	instrumented(d)
 
 	return nil
+}
+
+func (d *Driver) deprecatedBooleanFlag(opts drivers.DriverOptions, flag, deprecatedFlag string) bool {
+	if opts.Bool(deprecatedFlag) {
+		log.Warnf("--%v is deprecated, use --%v instead", deprecatedFlag, flag)
+		return true
+	}
+	return opts.Bool(flag)
 }
 
 func (d *Driver) setUserDataFlags(opts drivers.DriverOptions) error {
