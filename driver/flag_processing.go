@@ -1,0 +1,102 @@
+package driver
+
+import (
+	"github.com/docker/machine/libmachine/drivers"
+	"github.com/docker/machine/libmachine/log"
+	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/pkg/errors"
+	"strings"
+)
+
+func (d *Driver) setImageArch(arch string) error {
+	switch arch {
+	case "":
+		d.ImageArch = emptyImageArchitecture
+	case string(hcloud.ArchitectureARM):
+		d.ImageArch = hcloud.ArchitectureARM
+	case string(hcloud.ArchitectureX86):
+		d.ImageArch = hcloud.ArchitectureX86
+	default:
+		return errors.Errorf("unknown architecture %v", arch)
+	}
+	return nil
+}
+
+func (d *Driver) verifyImageFlags() error {
+	if d.ImageID != 0 && d.Image != "" && d.Image != defaultImage /* support legacy behaviour */ {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagImage, flagImageID)
+	} else if d.ImageID != 0 && d.ImageArch != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagImageArch, flagImageID)
+	} else if d.ImageID == 0 && d.Image == "" {
+		d.Image = defaultImage
+	}
+	return nil
+}
+
+func (d *Driver) verifyNetworkFlags() error {
+	if d.DisablePublic4 && d.DisablePublic6 && !d.UsePrivateNetwork {
+		return d.flagFailure("--%v must be used if public networking is disabled (hint: implicitly set by --%v)",
+			flagUsePrivateNetwork, flagDisablePublic)
+	}
+
+	if d.DisablePublic4 && d.PrimaryIPv4 != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagPrimary4, flagDisablePublic4)
+	}
+
+	if d.DisablePublic6 && d.PrimaryIPv6 != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagPrimary6, flagDisablePublic6)
+	}
+	return nil
+}
+
+func (d *Driver) deprecatedBooleanFlag(opts drivers.DriverOptions, flag, deprecatedFlag string) bool {
+	if opts.Bool(deprecatedFlag) {
+		log.Warnf("--%v is deprecated, use --%v instead", deprecatedFlag, flag)
+		return true
+	}
+	return opts.Bool(flag)
+}
+
+func (d *Driver) setUserDataFlags(opts drivers.DriverOptions) error {
+	userData := opts.String(flagUserData)
+	userDataFile := opts.String(flagUserDataFile)
+
+	if opts.Bool(legacyFlagUserDataFromFile) {
+		if userDataFile != "" {
+			return d.flagFailure("--%v and --%v are mutually exclusive", flagUserDataFile, legacyFlagUserDataFromFile)
+		}
+
+		log.Warnf("--%v is deprecated, pass '--%v \"%v\"'", legacyFlagUserDataFromFile, flagUserDataFile, userData)
+		d.userDataFile = userData
+		return nil
+	}
+
+	d.userData = userData
+	d.userDataFile = userDataFile
+
+	if d.userData != "" && d.userDataFile != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagUserData, flagUserDataFile)
+	}
+
+	return nil
+}
+
+func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
+	d.ServerLabels = make(map[string]string)
+	for _, label := range opts.StringSlice(flagServerLabel) {
+		split := strings.SplitN(label, "=", 2)
+		if len(split) != 2 {
+			return d.flagFailure("server label %v is not in key=value format", label)
+		}
+		d.ServerLabels[split[0]] = split[1]
+	}
+	d.keyLabels = make(map[string]string)
+	for _, label := range opts.StringSlice(flagKeyLabel) {
+		split := strings.SplitN(label, "=", 2)
+		if len(split) != 2 {
+			return errors.Errorf("key label %v is not in key=value format", label)
+		}
+		d.keyLabels[split[0]] = split[1]
+	}
+	return nil
+}

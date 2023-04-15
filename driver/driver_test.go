@@ -1,4 +1,4 @@
-package main
+package driver
 
 import (
 	"github.com/docker/machine/commands/commandstest"
@@ -36,7 +36,7 @@ func TestUserData(t *testing.T) {
 	}
 
 	// mutual exclusion data <=> data file
-	d := NewDriver()
+	d := NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagUserData:     inlineContents,
 		flagUserDataFile: file,
@@ -44,7 +44,7 @@ func TestUserData(t *testing.T) {
 	assertMutualExclusion(t, err, flagUserData, flagUserDataFile)
 
 	// mutual exclusion data file <=> legacy flag
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(&commandstest.FakeFlagger{
 		Data: map[string]interface{}{
 			legacyFlagUserDataFromFile: true,
@@ -54,7 +54,7 @@ func TestUserData(t *testing.T) {
 	assertMutualExclusion(t, err, legacyFlagUserDataFromFile, flagUserDataFile)
 
 	// inline user data
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagUserData: inlineContents,
 	}))
@@ -71,7 +71,7 @@ func TestUserData(t *testing.T) {
 	}
 
 	// file user data
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagUserDataFile: file,
 	}))
@@ -88,7 +88,7 @@ func TestUserData(t *testing.T) {
 	}
 
 	// legacy file user data
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagUserData:               file,
 		legacyFlagUserDataFromFile: true,
@@ -107,7 +107,7 @@ func TestUserData(t *testing.T) {
 }
 
 func TestDisablePublic(t *testing.T) {
-	d := NewDriver()
+	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagDisablePublic: true,
 	}))
@@ -127,7 +127,7 @@ func TestDisablePublic(t *testing.T) {
 }
 
 func TestDisablePublic46(t *testing.T) {
-	d := NewDriver()
+	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagDisablePublic4: true,
 	}))
@@ -146,7 +146,7 @@ func TestDisablePublic46(t *testing.T) {
 	}
 
 	// 6
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagDisablePublic6: true,
 	}))
@@ -166,7 +166,7 @@ func TestDisablePublic46(t *testing.T) {
 }
 
 func TestDisablePublic46Legacy(t *testing.T) {
-	d := NewDriver()
+	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		legacyFlagDisablePublic4: true,
 		// any truthy flag should take precedence
@@ -187,7 +187,7 @@ func TestDisablePublic46Legacy(t *testing.T) {
 	}
 
 	// 6
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		legacyFlagDisablePublic6: true,
 		// any truthy flag should take precedence
@@ -210,7 +210,7 @@ func TestDisablePublic46Legacy(t *testing.T) {
 
 func TestImageFlagExclusions(t *testing.T) {
 	// both id and name given
-	d := NewDriver()
+	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagImageID: 42,
 		flagImage:   "answer",
@@ -218,7 +218,7 @@ func TestImageFlagExclusions(t *testing.T) {
 	assertMutualExclusion(t, err, flagImageID, flagImage)
 
 	// both id and arch given
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagImageID:   42,
 		flagImageArch: string(hcloud.ArchitectureX86),
@@ -228,7 +228,7 @@ func TestImageFlagExclusions(t *testing.T) {
 
 func TestImageArch(t *testing.T) {
 	// no explicit arch
-	d := NewDriver()
+	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagImage: "answer",
 	}))
@@ -245,7 +245,7 @@ func TestImageArch(t *testing.T) {
 	testArchFlag(t, hcloud.ArchitectureX86)
 
 	// invalid
-	d = NewDriver()
+	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagImage:     "answer",
 		flagImageArch: "hal9000",
@@ -256,7 +256,7 @@ func TestImageArch(t *testing.T) {
 }
 
 func testArchFlag(t *testing.T, arch hcloud.Architecture) {
-	d := NewDriver()
+	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
 		flagImage:     "answer",
 		flagImageArch: string(arch),

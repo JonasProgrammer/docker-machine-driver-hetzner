@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/JonasProgrammer/docker-machine-driver-hetzner/driver"
 	"github.com/docker/machine/libmachine/drivers/plugin"
 )
 
@@ -14,10 +15,9 @@ var version string
 func main() {
 	versionFlag := flag.Bool("v", false, "prints current docker-machine-driver-hetzner version")
 	flag.Parse()
-	instrumented("sadf")
 	if *versionFlag {
 		fmt.Printf("Version: %s\n", version)
 		os.Exit(0)
 	}
-	plugin.RegisterDriver(NewDriver())
+	plugin.RegisterDriver(driver.NewDriver(version))
 }

@@ -1,6 +1,6 @@
 //go:build !flag_debug && !instrumented
 
-package main
+package driver
 
 import (
 	"github.com/docker/machine/libmachine/drivers"

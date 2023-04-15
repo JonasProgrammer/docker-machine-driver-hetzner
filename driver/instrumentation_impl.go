@@ -1,6 +1,6 @@
 //go:build instrumented
 
-package main
+package driver
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 
 	"github.com/docker/machine/libmachine/log"
 )
+
+const runningInstrumented = false
 
 func instrumented[T any](input T) T {
 	j, err := json.Marshal(input)
