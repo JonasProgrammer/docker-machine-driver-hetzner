@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.12.2/docker-machine-driver-hetzner_3.12.2_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.12.2_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.13.0/docker-machine-driver-hetzner_3.13.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_3.13.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -91,7 +91,8 @@ $ docker-machine create \
 ## Options
 
 - `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
-- `--hetzner-image`: The name of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (defaults to `ubuntu-18.04`).
+- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (defaults to `ubuntu-18.04`).
+- `--hetzner-image`: The architecture to use during image lookup, inferred from the server type if not explicitly given.
 - `--hetzner-image-id`: The id of the Hetzner cloud image (or snapshot) to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (mutually excludes `--hetzner-image`).
 - `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
 - `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
@@ -115,6 +116,15 @@ $ docker-machine create \
 - `--hetzner-primary-ipv4/6`: Sets an existing primary IP (v4 or v6 respectively) for the server, as documented in [Networking](#networking)
 - `--hetzner-wait-on-error`: Amount of seconds to wait on server creation failure (0/no wait by default)
 
+#### Image selection
+
+When `--hetzner-image-id` is passed, it will be used for lookup by ID as-is. No additional validation is performed, and it is mutually exclusive with
+other `--hetzner-image*`-flags.
+
+When `--hetzner-image` is passed, lookup will happen either by name or by ID as per Hetzner-supplied logic. The lookup mechanism will filter by image
+architecture, which is usually inferred from the server type. One may explicitly specify it using `--hetzner-image-arch` in which case the user
+supplied value will take precedence.
+
 #### Existing SSH keys
 
 When you specify the `--hetzner-existing-key-path` option, the driver will attempt to copy `(specified file name)`
@@ -136,6 +146,7 @@ was used during creation.
 |---------------------------------|-------------------------------| -------------------------- |
 | **`--hetzner-api-token`**       | `HETZNER_API_TOKEN`           |                            |
 | `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-18.04`             |
+| `--hetzner-image-arch`          | `HETZNER_IMAGE_ARCH`          | *(infer from server)*      |
 | `--hetzner-image-id`            | `HETZNER_IMAGE_ID`            |                            |
 | `--hetzner-server-type`         | `HETZNER_TYPE`                | `cx11`                     |
 | `--hetzner-server-location`     | `HETZNER_LOCATION`            | *(let Hetzner choose)*     |

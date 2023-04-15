@@ -26,6 +26,7 @@ type Driver struct {
 	AccessToken       string
 	Image             string
 	ImageID           int
+	ImageArch         hcloud.Architecture
 	cachedImage       *hcloud.Image
 	Type              string
 	cachedType        *hcloud.ServerType
@@ -69,6 +70,7 @@ const (
 	flagAPIToken          = "hetzner-api-token"
 	flagImage             = "hetzner-image"
 	flagImageID           = "hetzner-image-id"
+	flagImageArch         = "hetzner-image-arch"
 	flagType              = "hetzner-server-type"
 	flagLocation          = "hetzner-server-location"
 	flagExKeyID           = "hetzner-existing-key-id"
@@ -108,6 +110,8 @@ const (
 	legacyFlagUserDataFromFile = "hetzner-user-data-from-file"
 	legacyFlagDisablePublic4   = "hetzner-disable-public-4"
 	legacyFlagDisablePublic6   = "hetzner-disable-public-6"
+
+	emptyImageArchitecture = hcloud.Architecture("")
 )
 
 // NewDriver initializes a new driver instance; see [drivers.Driver.NewDriver]
@@ -143,6 +147,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "HETZNER_IMAGE_ID",
 			Name:   flagImageID,
 			Usage:  "Image to use for server creation",
+		},
+		mcnflag.StringFlag{
+			EnvVar: "HETZNER_IMAGE_ARCH",
+			Name:   flagImageArch,
+			Usage:  "Image architecture for lookup to use for server creation",
 		},
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_TYPE",
@@ -305,12 +314,16 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
 	d.ImageID = opts.Int(flagImageID)
+	err := d.setImageArch(opts.String(flagImageArch))
+	if err != nil {
+		return err
+	}
 	d.Location = opts.String(flagLocation)
 	d.Type = opts.String(flagType)
 	d.KeyID = opts.Int(flagExKeyID)
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
-	err := d.setUserDataFlags(opts)
+	err = d.setUserDataFlags(opts)
 	if err != nil {
 		return err
 	}
@@ -349,12 +362,45 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 		return d.flagFailure("hetzner requires --%v to be set", flagAPIToken)
 	}
 
+	if err = d.verifyImageFlags(); err != nil {
+		return err
+	}
+
+	if err = d.verifyNetworkFlags(); err != nil {
+		return err
+	}
+
+	instrumented(d)
+
+	return nil
+}
+
+func (d *Driver) setImageArch(arch string) error {
+	switch arch {
+	case "":
+		d.ImageArch = emptyImageArchitecture
+	case string(hcloud.ArchitectureARM):
+		d.ImageArch = hcloud.ArchitectureARM
+	case string(hcloud.ArchitectureX86):
+		d.ImageArch = hcloud.ArchitectureX86
+	default:
+		return errors.Errorf("unknown architecture %v", arch)
+	}
+	return nil
+}
+
+func (d *Driver) verifyImageFlags() error {
 	if d.ImageID != 0 && d.Image != "" && d.Image != defaultImage /* support legacy behaviour */ {
 		return d.flagFailure("--%v and --%v are mutually exclusive", flagImage, flagImageID)
+	} else if d.ImageID != 0 && d.ImageArch != "" {
+		return d.flagFailure("--%v and --%v are mutually exclusive", flagImageArch, flagImageID)
 	} else if d.ImageID == 0 && d.Image == "" {
 		d.Image = defaultImage
 	}
+	return nil
+}
 
+func (d *Driver) verifyNetworkFlags() error {
 	if d.DisablePublic4 && d.DisablePublic6 && !d.UsePrivateNetwork {
 		return d.flagFailure("--%v must be used if public networking is disabled (hint: implicitly set by --%v)",
 			flagUsePrivateNetwork, flagDisablePublic)
@@ -367,9 +413,6 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	if d.DisablePublic6 && d.PrimaryIPv6 != "" {
 		return d.flagFailure("--%v and --%v are mutually exclusive", flagPrimary6, flagDisablePublic6)
 	}
-
-	instrumented(d)
-
 	return nil
 }
 
@@ -437,35 +480,14 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 
 // PreCreateCheck validates the Driver data is in a valid state for creation; see [drivers.Driver.PreCreateCheck]
 func (d *Driver) PreCreateCheck() error {
-	if d.IsExistingKey {
-		if d.originalKey == "" {
-			return d.flagFailure("specifying an existing key ID requires the existing key path to be set as well")
-		}
-
-		key, err := d.getKey()
-		if err != nil {
-			return errors.Wrap(err, "could not get key")
-		}
-
-		buf, err := os.ReadFile(d.originalKey + ".pub")
-		if err != nil {
-			return errors.Wrap(err, "could not read public key")
-		}
-
-		// Will also parse `ssh-rsa w309jwf0e39jf asdf` public keys
-		pubk, _, _, _, err := ssh.ParseAuthorizedKey(buf)
-		if err != nil {
-			return errors.Wrap(err, "could not parse authorized key")
-		}
-
-		if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
-			key.Fingerprint != ssh.FingerprintSHA256(pubk) {
-			return errors.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
-		}
+	if err := d.setupExistingKey(); err != nil {
+		return err
 	}
 
-	if _, err := d.getType(); err != nil {
+	if serverType, err := d.getType(); err != nil {
 		return errors.Wrap(err, "could not get type")
+	} else if d.ImageArch != "" && serverType.Architecture != d.ImageArch {
+		log.Warnf("supplied architecture %v differs from server architecture %v", d.ImageArch, serverType.Architecture)
 	}
 
 	if _, err := d.getImage(); err != nil {
@@ -490,6 +512,39 @@ func (d *Driver) PreCreateCheck() error {
 
 	if d.UsePrivateNetwork && len(d.Networks) == 0 {
 		return errors.Errorf("No private network attached.")
+	}
+
+	return nil
+}
+
+func (d *Driver) setupExistingKey() error {
+	if !d.IsExistingKey {
+		return nil
+	}
+
+	if d.originalKey == "" {
+		return d.flagFailure("specifying an existing key ID requires the existing key path to be set as well")
+	}
+
+	key, err := d.getKey()
+	if err != nil {
+		return errors.Wrap(err, "could not get key")
+	}
+
+	buf, err := os.ReadFile(d.originalKey + ".pub")
+	if err != nil {
+		return errors.Wrap(err, "could not read public key")
+	}
+
+	// Will also parse `ssh-rsa w309jwf0e39jf asdf` public keys
+	pubk, _, _, _, err := ssh.ParseAuthorizedKey(buf)
+	if err != nil {
+		return errors.Wrap(err, "could not parse authorized key")
+	}
+
+	if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
+		key.Fingerprint != ssh.FingerprintSHA256(pubk) {
+		return errors.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
 	}
 
 	return nil
@@ -872,26 +927,8 @@ func (d *Driver) GetState() (state.State, error) {
 
 // Remove deletes the hetzner server and additional resources created during creation; see [drivers.Driver.Remove]
 func (d *Driver) Remove() error {
-	if d.ServerID != 0 {
-		srv, err := d.getServerHandle()
-		if err != nil {
-			return errors.Wrap(err, "could not get server handle")
-		}
-
-		if srv == nil {
-			log.Infof(" -> Server does not exist anymore")
-		} else {
-			log.Infof(" -> Destroying server %s[%d] in...", srv.Name, srv.ID)
-
-			if _, err := d.getClient().Server.Delete(context.Background(), srv); err != nil {
-				return errors.Wrap(err, "could not delete server")
-			}
-
-			// failure to remove a placement group is not a hard error
-			if softErr := d.removeEmptyServerPlacementGroup(srv); softErr != nil {
-				log.Error(softErr)
-			}
-		}
+	if err := d.destroyServer(); err != nil {
+		return err
 	}
 
 	// failure to remove a key is not ha hard error
@@ -925,6 +962,40 @@ func (d *Driver) Remove() error {
 
 		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
 			return errors.Wrap(err, "could not delete ssh key")
+		}
+	}
+
+	return nil
+}
+
+func (d *Driver) destroyServer() error {
+	if d.ServerID == 0 {
+		return nil
+	}
+
+	srv, err := d.getServerHandle()
+	if err != nil {
+		return errors.Wrap(err, "could not get server handle")
+	}
+
+	if srv == nil {
+		log.Infof(" -> Server does not exist anymore")
+	} else {
+		log.Infof(" -> Destroying server %s[%d] in...", srv.Name, srv.ID)
+
+		res, _, err := d.getClient().Server.DeleteWithResult(context.Background(), srv)
+		if err != nil {
+			return errors.Wrap(err, "could not delete server")
+		}
+
+		// failure to remove a placement group is not a hard error
+		if softErr := d.removeEmptyServerPlacementGroup(srv); softErr != nil {
+			log.Error(softErr)
+		}
+
+		// wait for the server to actually be deleted
+		if err = d.waitForAction(res.Action); err != nil {
+			return errors.Wrap(err, "could not wait for deletion")
 		}
 	}
 
@@ -1071,7 +1142,12 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 			return image, errors.Wrap(err, fmt.Sprintf("could not get image by id %v", d.ImageID))
 		}
 	} else {
-		image, _, err = d.getClient().Image.GetByName(context.Background(), d.Image)
+		arch, err := d.getImageArchitectureForLookup()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not determine image architecture")
+		}
+
+		image, _, err = d.getClient().Image.GetByNameAndArchitecture(context.Background(), d.Image, arch)
 		if err != nil {
 			return image, errors.Wrap(err, fmt.Sprintf("could not get image by name %v", d.Image))
 		}
@@ -1079,6 +1155,19 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 
 	d.cachedImage = image
 	return instrumented(image), nil
+}
+
+func (d *Driver) getImageArchitectureForLookup() (hcloud.Architecture, error) {
+	if d.ImageArch != emptyImageArchitecture {
+		return d.ImageArch, nil
+	}
+
+	serverType, err := d.getType()
+	if err != nil {
+		return "", err
+	}
+
+	return serverType.Architecture, nil
 }
 
 func (d *Driver) getKey() (*hcloud.SSHKey, error) {

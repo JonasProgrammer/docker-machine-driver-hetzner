@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/docker/machine/commands/commandstest"
 	"github.com/docker/machine/libmachine/drivers"
+	"github.com/hetznercloud/hcloud-go/hcloud"
 	"os"
 	"strings"
 	"testing"
@@ -204,6 +205,68 @@ func TestDisablePublic46Legacy(t *testing.T) {
 	}
 	if d.UsePrivateNetwork {
 		t.Error("network enabled unexpectedly")
+	}
+}
+
+func TestImageFlagExclusions(t *testing.T) {
+	// both id and name given
+	d := NewDriver()
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImageID: 42,
+		flagImage:   "answer",
+	}))
+	assertMutualExclusion(t, err, flagImageID, flagImage)
+
+	// both id and arch given
+	d = NewDriver()
+	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImageID:   42,
+		flagImageArch: string(hcloud.ArchitectureX86),
+	}))
+	assertMutualExclusion(t, err, flagImageID, flagImageArch)
+}
+
+func TestImageArch(t *testing.T) {
+	// no explicit arch
+	d := NewDriver()
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImage: "answer",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if d.ImageArch != emptyImageArchitecture {
+		t.Errorf("expected empty architecture, but got %v", d.ImageArch)
+	}
+
+	// existing architectures
+	testArchFlag(t, hcloud.ArchitectureARM)
+	testArchFlag(t, hcloud.ArchitectureX86)
+
+	// invalid
+	d = NewDriver()
+	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImage:     "answer",
+		flagImageArch: "hal9000",
+	}))
+	if err == nil {
+		t.Fatal("expected error, but invalid arch was accepted")
+	}
+}
+
+func testArchFlag(t *testing.T, arch hcloud.Architecture) {
+	d := NewDriver()
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImage:     "answer",
+		flagImageArch: string(arch),
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if d.ImageArch != arch {
+		t.Errorf("expected %v architecture, but got %v", arch, d.ImageArch)
 	}
 }
 
