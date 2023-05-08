@@ -91,8 +91,8 @@ $ docker-machine create \
 ## Options
 
 - `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
-- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (defaults to `ubuntu-20.04`).
-- `--hetzner-image`: The architecture to use during image lookup, inferred from the server type if not explicitly given.
+- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (currently defaults to `ubuntu-20.04`). *Explicitly specifying an image is **strongly** recommended and will be **required from v6 onwards***.
+- `--hetzner-image-arch`: The architecture to use during image lookup, inferred from the server type if not explicitly given.
 - `--hetzner-image-id`: The id of the Hetzner cloud image (or snapshot) to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (mutually excludes `--hetzner-image`).
 - `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
 - `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
@@ -125,6 +125,9 @@ When `--hetzner-image` is passed, lookup will happen either by name or by ID as 
 architecture, which is usually inferred from the server type. One may explicitly specify it using `--hetzner-image-arch` in which case the user
 supplied value will take precedence.
 
+While there is currently a default image as fallback, this behaviour will be removed in a future version. Explicitly specifying an operating system
+image is strongly recommended for new deployments, and will be mandatory in upcoming versions.
+
 #### Existing SSH keys
 
 When you specify the `--hetzner-existing-key-path` option, the driver will attempt to copy `(specified file name)`
@@ -143,9 +146,9 @@ was used during creation.
 #### Environment variables and default values
 
 | CLI option                      | Environment variable          | Default                    |
-|---------------------------------|-------------------------------| -------------------------- |
+|---------------------------------|-------------------------------|----------------------------|
 | **`--hetzner-api-token`**       | `HETZNER_API_TOKEN`           |                            |
-| `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-20.04`             |
+| `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-20.04` as fallback |
 | `--hetzner-image-arch`          | `HETZNER_IMAGE_ARCH`          | *(infer from server)*      |
 | `--hetzner-image-id`            | `HETZNER_IMAGE_ID`            |                            |
 | `--hetzner-server-type`         | `HETZNER_TYPE`                | `cx11`                     |
@@ -247,6 +250,7 @@ $ docker-machine create --driver hetzner
 
 ### 4.0.0
 
+* **check log output for BREAKING-V5**
 * `--hetzner-user-data-from-file` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-flag-user-data-file` should be used instead.
 * `--hetzner-disable-public-4`/`--hetzner-disable-public-6` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-disable-public-ipv4`/`--hetzner-disable-public-ipv6` should be used instead.
 
@@ -254,3 +258,8 @@ $ docker-machine create --driver hetzner
 
 * `--hetzner-user-data-from-file` will be removed entirely, including its fallback behavior
 * `--hetzner-disable-public-4`/`--hetzner-disable-public-6` ill be removed entirely, including their fallback behavior
+* not specifying `--hetzner-image` will generate a warning stating 'use of default image is DEPRECATED'
+
+### 6.0.0
+
+* specifying `--hetzner-image` will be mandatory, and a default image will no longer be provided

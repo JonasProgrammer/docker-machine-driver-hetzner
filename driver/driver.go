@@ -59,6 +59,7 @@ type Driver struct {
 
 	// internal housekeeping
 	version string
+	usesDfr bool
 }
 
 const (
@@ -182,7 +183,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_USER_DATA_FROM_FILE",
 			Name:   legacyFlagUserDataFromFile,
-			Usage:  "DEPRECATED, use --hetzner-user-data-file. Treat --hetzner-user-data argument as filename.",
+			Usage:  "DEPRECATED, legacy.",
 		},
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_USER_DATA_FILE",
@@ -215,7 +216,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_DISABLE_PUBLIC_4",
 			Name:   legacyFlagDisablePublic4,
-			Usage:  "DEPRECATED, use --hetzner-disable-public-ipv4; disable public ipv4",
+			Usage:  "DEPRECATED, legacy",
 		},
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_DISABLE_PUBLIC_IPV6",
@@ -225,7 +226,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_DISABLE_PUBLIC_6",
 			Name:   legacyFlagDisablePublic6,
-			Usage:  "DEPRECATED, use --hetzner-disable-public-ipv6; disable public ipv6",
+			Usage:  "DEPRECATED, legacy",
 		},
 		mcnflag.BoolFlag{
 			EnvVar: "HETZNER_DISABLE_PUBLIC",
@@ -367,6 +368,13 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	}
 
 	instrumented(d)
+
+	if d.usesDfr {
+		log.Warn("!!!! BREAKING-V5 !!!!")
+		log.Warn("your configuration uses deprecated flags and will stop working as-is from v5 onwards")
+		log.Warn("check preceding output for 'DEPRECATED' log statements")
+		log.Warn("!!!! /BREAKING-V5 !!!!")
+	}
 
 	return nil
 }
