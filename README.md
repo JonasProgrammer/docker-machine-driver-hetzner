@@ -91,7 +91,7 @@ $ docker-machine create \
 ## Options
 
 - `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
-- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (defaults to `ubuntu-18.04`).
+- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (defaults to `ubuntu-20.04`).
 - `--hetzner-image`: The architecture to use during image lookup, inferred from the server type if not explicitly given.
 - `--hetzner-image-id`: The id of the Hetzner cloud image (or snapshot) to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (mutually excludes `--hetzner-image`).
 - `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
@@ -145,7 +145,7 @@ was used during creation.
 | CLI option                      | Environment variable          | Default                    |
 |---------------------------------|-------------------------------| -------------------------- |
 | **`--hetzner-api-token`**       | `HETZNER_API_TOKEN`           |                            |
-| `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-18.04`             |
+| `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-20.04`             |
 | `--hetzner-image-arch`          | `HETZNER_IMAGE_ARCH`          | *(infer from server)*      |
 | `--hetzner-image-id`            | `HETZNER_IMAGE_ID`            |                            |
 | `--hetzner-server-type`         | `HETZNER_TYPE`                | `cx11`                     |
