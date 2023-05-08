@@ -51,7 +51,8 @@ func (d *Driver) verifyNetworkFlags() error {
 
 func (d *Driver) deprecatedBooleanFlag(opts drivers.DriverOptions, flag, deprecatedFlag string) bool {
 	if opts.Bool(deprecatedFlag) {
-		log.Warnf("--%v is deprecated, use --%v instead", deprecatedFlag, flag)
+		log.Warnf("--%v is DEPRECATED FOR REMOVAL, use --%v instead", deprecatedFlag, flag)
+		d.usesDfr = true
 		return true
 	}
 	return opts.Bool(flag)
@@ -66,7 +67,8 @@ func (d *Driver) setUserDataFlags(opts drivers.DriverOptions) error {
 			return d.flagFailure("--%v and --%v are mutually exclusive", flagUserDataFile, legacyFlagUserDataFromFile)
 		}
 
-		log.Warnf("--%v is deprecated, pass '--%v \"%v\"'", legacyFlagUserDataFromFile, flagUserDataFile, userData)
+		log.Warnf("--%v is DEPRECATED FOR REMOVAL, pass '--%v \"%v\"'", legacyFlagUserDataFromFile, flagUserDataFile, userData)
+		d.usesDfr = true
 		d.userDataFile = userData
 		return nil
 	}
