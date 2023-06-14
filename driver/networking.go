@@ -93,7 +93,7 @@ func (d *Driver) configureNetworkAccess(srv hcloud.ServerCreateResult) error {
 				d.IPAddress = server.PrivateNet[0].IP.String()
 				break
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(time.Duration(d.WaitOnPolling) * time.Second)
 		}
 	} else if d.DisablePublic4 {
 		log.Infof("Using public IPv6 network ...")
