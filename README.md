@@ -116,6 +116,7 @@ $ docker-machine create \
 - `--hetzner-primary-ipv4/6`: Sets an existing primary IP (v4 or v6 respectively) for the server, as documented in [Networking](#networking)
 - `--hetzner-wait-on-error`: Amount of seconds to wait on server creation failure (0/no wait by default)
 - `--hetzner-wait-on-polling`: Amount of seconds to wait between requests when waiting for some state to change. (Default: 1 second)
+- `--hetzner-wait-for-running-timeout`: Max amount of seconds to wait until a machine is running. (Default: 0/no timeout)
 
 #### Image selection
 
