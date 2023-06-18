@@ -10,6 +10,7 @@ import (
 )
 
 func (d *Driver) waitForRunningServer() error {
+	start_time := time.Now()
 	for {
 		srvstate, err := d.GetState()
 		if err != nil {
@@ -20,7 +21,12 @@ func (d *Driver) waitForRunningServer() error {
 			break
 		}
 
-		time.Sleep(1 * time.Second)
+		elapsed_time := time.Since(start_time).Seconds()
+		if d.WaitForRunningTimeout > 0 && int(elapsed_time) > d.WaitForRunningTimeout {
+			return errors.Errorf("server exceeded wait-for-running-timeout.")
+		}
+
+		time.Sleep(time.Duration(d.WaitOnPolling) * time.Second)
 	}
 	return nil
 }

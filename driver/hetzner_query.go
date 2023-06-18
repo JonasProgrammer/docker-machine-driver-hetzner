@@ -144,7 +144,7 @@ func (d *Driver) waitForAction(a *hcloud.Action) error {
 			return act.Error()
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Duration(d.WaitOnPolling) * time.Second)
 	}
 	return nil
 }

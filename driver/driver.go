@@ -56,6 +56,8 @@ type Driver struct {
 	cachedAdditionalKeys []*hcloud.SSHKey
 
 	WaitOnError int
+	WaitOnPolling int
+	WaitForRunningTimeout int
 
 	// internal housekeeping
 	version string
@@ -97,8 +99,12 @@ const (
 	defaultSSHPort = 22
 	defaultSSHUser = "root"
 
-	flagWaitOnError    = "hetzner-wait-on-error"
-	defaultWaitOnError = 0
+	flagWaitOnError                = "hetzner-wait-on-error"
+	defaultWaitOnError             = 0
+	flagWaitOnPolling              = "hetzner-wait-on-polling"
+	defaultWaitOnPolling           = 1
+	flagWaitForRunningTimeout      = "hetzner-wait-for-running-timeout"
+	defaultWaitForRunningTimeout   = 0
 
 	legacyFlagUserDataFromFile = "hetzner-user-data-from-file"
 	legacyFlagDisablePublic4   = "hetzner-disable-public-4"
@@ -298,6 +304,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Wait if an error happens while creating the server",
 			Value:  defaultWaitOnError,
 		},
+		mcnflag.IntFlag{
+			EnvVar: "HETZNER_WAIT_ON_POLLING",
+			Name:   flagWaitOnPolling,
+			Usage:  "Period for waiting between requests when waiting for some state to change",
+			Value:  defaultWaitOnPolling,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "HETZNER_WAIT_FOR_RUNNING_TIMEOUT",
+			Name:   flagWaitForRunningTimeout,
+			Usage:  "Period for waiting for a machine to be running before failing",
+			Value:  defaultWaitForRunningTimeout,
+		},
 	}
 }
 
@@ -339,6 +357,8 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	d.SSHPort = opts.Int(flagSshPort)
 
 	d.WaitOnError = opts.Int(flagWaitOnError)
+	d.WaitOnPolling = opts.Int(flagWaitOnPolling)
+	d.WaitForRunningTimeout = opts.Int(flagWaitForRunningTimeout)
 
 	d.placementGroup = opts.String(flagPlacementGroup)
 	if opts.Bool(flagAutoSpread) {

@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/3.13.0/docker-machine-driver-hetzner_3.13.0_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_3.13.0_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/4.1.0/docker-machine-driver-hetzner_4.1.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_4.1.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -115,6 +115,8 @@ $ docker-machine create \
 - `--hetzner-ssh-port`: Change the default SSH-Port
 - `--hetzner-primary-ipv4/6`: Sets an existing primary IP (v4 or v6 respectively) for the server, as documented in [Networking](#networking)
 - `--hetzner-wait-on-error`: Amount of seconds to wait on server creation failure (0/no wait by default)
+- `--hetzner-wait-on-polling`: Amount of seconds to wait between requests when waiting for some state to change. (Default: 1 second)
+- `--hetzner-wait-for-running-timeout`: Max amount of seconds to wait until a machine is running. (Default: 0/no timeout)
 
 #### Image selection
 
@@ -145,35 +147,37 @@ was used during creation.
 
 #### Environment variables and default values
 
-| CLI option                      | Environment variable          | Default                    |
-|---------------------------------|-------------------------------|----------------------------|
-| **`--hetzner-api-token`**       | `HETZNER_API_TOKEN`           |                            |
-| `--hetzner-image`               | `HETZNER_IMAGE`               | `ubuntu-20.04` as fallback |
-| `--hetzner-image-arch`          | `HETZNER_IMAGE_ARCH`          | *(infer from server)*      |
-| `--hetzner-image-id`            | `HETZNER_IMAGE_ID`            |                            |
-| `--hetzner-server-type`         | `HETZNER_TYPE`                | `cx11`                     |
-| `--hetzner-server-location`     | `HETZNER_LOCATION`            | *(let Hetzner choose)*     |
-| `--hetzner-existing-key-path`   | `HETZNER_EXISTING_KEY_PATH`   | *(generate new keypair)*   |
-| `--hetzner-existing-key-id`     | `HETZNER_EXISTING_KEY_ID`     | 0 *(upload new key)*       |
-| `--hetzner-additional-key`      | `HETZNER_ADDITIONAL_KEYS`     |                            |
-| `--hetzner-user-data`           | `HETZNER_USER_DATA`           |                            |
-| `--hetzner-user-data-file`      | `HETZNER_USER_DATA_FILE`      |                            |
-| `--hetzner-networks`            | `HETZNER_NETWORKS`            |                            |
-| `--hetzner-firewalls`           | `HETZNER_FIREWALLS`           |                            |
-| `--hetzner-volumes`             | `HETZNER_VOLUMES`             |                            |
-| `--hetzner-use-private-network` | `HETZNER_USE_PRIVATE_NETWORK` | false                      |
-| `--hetzner-disable-public-ipv4` | `HETZNER_DISABLE_PUBLIC_IPV4` | false                      |
-| `--hetzner-disable-public-ipv6` | `HETZNER_DISABLE_PUBLIC_IPV6` | false                      |
-| `--hetzner-disable-public`      | `HETZNER_DISABLE_PUBLIC`      | false                      |
-| `--hetzner-server-label`        | (inoperative)                 | `[]`                       |
-| `--hetzner-key-label`           | (inoperative)                 | `[]`                       |
-| `--hetzner-placement-group`     | `HETZNER_PLACEMENT_GROUP`     |                            |
-| `--hetzner-auto-spread`         | `HETZNER_AUTO_SPREAD`         | false                      |
-| `--hetzner-ssh-user`            | `HETZNER_SSH_USER`            | root                       |
-| `--hetzner-ssh-port`            | `HETZNER_SSH_PORT`            | 22                         |
-| `--hetzner-primary-ipv4`        | `HETZNER_PRIMARY_IPV4`        |                            |
-| `--hetzner-primary-ipv6`        | `HETZNER_PRIMARY_IPV6`        |                            |
-| `--hetzner-wait-on-error`       | `HETZNER_WAIT_ON_ERROR`       | 0                          |
+| CLI option                           | Environment variable               | Default                    |
+|--------------------------------------|------------------------------------|----------------------------|
+| **`--hetzner-api-token`**            | `HETZNER_API_TOKEN`                |                            |
+| `--hetzner-image`                    | `HETZNER_IMAGE`                    | `ubuntu-20.04` as fallback |
+| `--hetzner-image-arch`               | `HETZNER_IMAGE_ARCH`               | *(infer from server)*      |
+| `--hetzner-image-id`                 | `HETZNER_IMAGE_ID`                 |                            |
+| `--hetzner-server-type`              | `HETZNER_TYPE`                     | `cx11`                     |
+| `--hetzner-server-location`          | `HETZNER_LOCATION`                 | *(let Hetzner choose)*     |
+| `--hetzner-existing-key-path`        | `HETZNER_EXISTING_KEY_PATH`        | *(generate new keypair)*   |
+| `--hetzner-existing-key-id`          | `HETZNER_EXISTING_KEY_ID`          | 0 *(upload new key)*       |
+| `--hetzner-additional-key`           | `HETZNER_ADDITIONAL_KEYS`          |                            |
+| `--hetzner-user-data`                | `HETZNER_USER_DATA`                |                            |
+| `--hetzner-user-data-file`           | `HETZNER_USER_DATA_FILE`           |                            |
+| `--hetzner-networks`                 | `HETZNER_NETWORKS`                 |                            |
+| `--hetzner-firewalls`                | `HETZNER_FIREWALLS`                |                            |
+| `--hetzner-volumes`                  | `HETZNER_VOLUMES`                  |                            |
+| `--hetzner-use-private-network`      | `HETZNER_USE_PRIVATE_NETWORK`      | false                      |
+| `--hetzner-disable-public-ipv4`      | `HETZNER_DISABLE_PUBLIC_IPV4`      | false                      |
+| `--hetzner-disable-public-ipv6`      | `HETZNER_DISABLE_PUBLIC_IPV6`      | false                      |
+| `--hetzner-disable-public`           | `HETZNER_DISABLE_PUBLIC`           | false                      |
+| `--hetzner-server-label`             | (inoperative)                      | `[]`                       |
+| `--hetzner-key-label`                | (inoperative)                      | `[]`                       |
+| `--hetzner-placement-group`          | `HETZNER_PLACEMENT_GROUP`          |                            |
+| `--hetzner-auto-spread`              | `HETZNER_AUTO_SPREAD`              | false                      |
+| `--hetzner-ssh-user`                 | `HETZNER_SSH_USER`                 | root                       |
+| `--hetzner-ssh-port`                 | `HETZNER_SSH_PORT`                 | 22                         |
+| `--hetzner-primary-ipv4`             | `HETZNER_PRIMARY_IPV4`             |                            |
+| `--hetzner-primary-ipv6`             | `HETZNER_PRIMARY_IPV6`             |                            |
+| `--hetzner-wait-on-error`            | `HETZNER_WAIT_ON_ERROR`            | 0                          |
+| `--hetzner-wait-on-polling`          | `HETZNER_WAIT_ON_POLLING`          | 1                          |
+| `--hetzner-wait-for-running-timeout` | `HETZNER_WAIT_FOR_RUNNING_TIMEOUT` | 0                          |
 
 #### Networking
 
