@@ -21,7 +21,10 @@ func (d *Driver) getLocation() (*hcloud.Location, error) {
 
 	location, _, err := d.getClient().Location.GetByName(context.Background(), d.Location)
 	if err != nil {
-		return location, errors.Wrap(err, "could not get location by name")
+		return nil, errors.Wrap(err, "could not get location by name")
+	}
+	if location == nil {
+		return nil, fmt.Errorf("unknown location: %v", d.Location)
 	}
 	d.cachedLocation = location
 	return location, nil
@@ -34,7 +37,10 @@ func (d *Driver) getType() (*hcloud.ServerType, error) {
 
 	stype, _, err := d.getClient().ServerType.GetByName(context.Background(), d.Type)
 	if err != nil {
-		return stype, errors.Wrap(err, "could not get type by name")
+		return nil, errors.Wrap(err, "could not get type by name")
+	}
+	if stype == nil {
+		return nil, fmt.Errorf("unknown server type: %v", d.Type)
 	}
 	d.cachedType = stype
 	return instrumented(stype), nil
@@ -51,7 +57,10 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 	if d.ImageID != 0 {
 		image, _, err = d.getClient().Image.GetByID(context.Background(), d.ImageID)
 		if err != nil {
-			return image, errors.Wrap(err, fmt.Sprintf("could not get image by id %v", d.ImageID))
+			return nil, errors.Wrap(err, fmt.Sprintf("could not get image by id %v", d.ImageID))
+		}
+		if image == nil {
+			return nil, fmt.Errorf("image id not found: %v", d.ImageID)
 		}
 	} else {
 		arch, err := d.getImageArchitectureForLookup()
@@ -61,7 +70,10 @@ func (d *Driver) getImage() (*hcloud.Image, error) {
 
 		image, _, err = d.getClient().Image.GetByNameAndArchitecture(context.Background(), d.Image, arch)
 		if err != nil {
-			return image, errors.Wrap(err, fmt.Sprintf("could not get image by name %v", d.Image))
+			return nil, errors.Wrap(err, fmt.Sprintf("could not get image by name %v", d.Image))
+		}
+		if image == nil {
+			return nil, fmt.Errorf("image not found: %v[%v]", d.Image, arch)
 		}
 	}
 
@@ -87,12 +99,15 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 		return d.cachedKey, nil
 	}
 
-	stype, _, err := d.getClient().SSHKey.GetByID(context.Background(), d.KeyID)
+	key, _, err := d.getClient().SSHKey.GetByID(context.Background(), d.KeyID)
 	if err != nil {
-		return stype, errors.Wrap(err, "could not get sshkey by ID")
+		return nil, errors.Wrap(err, "could not get sshkey by ID")
 	}
-	d.cachedKey = stype
-	return instrumented(stype), nil
+	if key == nil {
+		return nil, fmt.Errorf("key not found: %v", d.KeyID)
+	}
+	d.cachedKey = key
+	return instrumented(key), nil
 }
 
 func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud.SSHKey, error) {
@@ -107,10 +122,24 @@ func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud
 	if err != nil {
 		return remoteKey, errors.Wrap(err, "could not get sshkey by fingerprint")
 	}
+	if remoteKey == nil {
+		return nil, fmt.Errorf("key not found by fingerprint: %v", fp)
+	}
 	return instrumented(remoteKey), nil
 }
 
 func (d *Driver) getServerHandle() (*hcloud.Server, error) {
+	srv, err := d.getServerHandleNullable()
+	if err != nil {
+		return nil, err
+	}
+	if srv == nil {
+		return nil, fmt.Errorf("server does not exist: %v", d.ServerID)
+	}
+	return srv, nil
+}
+
+func (d *Driver) getServerHandleNullable() (*hcloud.Server, error) {
 	if d.cachedServer != nil {
 		return d.cachedServer, nil
 	}
@@ -133,6 +162,9 @@ func (d *Driver) waitForAction(a *hcloud.Action) error {
 		act, _, err := d.getClient().Action.GetByID(context.Background(), a.ID)
 		if err != nil {
 			return errors.Wrap(err, "could not get client by ID")
+		}
+		if act == nil {
+			return fmt.Errorf("action not found: %v", a.ID)
 		}
 
 		if act.Status == hcloud.ActionStatusSuccess {

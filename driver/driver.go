@@ -55,8 +55,8 @@ type Driver struct {
 	AdditionalKeyIDs     []int
 	cachedAdditionalKeys []*hcloud.SSHKey
 
-	WaitOnError int
-	WaitOnPolling int
+	WaitOnError           int
+	WaitOnPolling         int
 	WaitForRunningTimeout int
 
 	// internal housekeeping
@@ -99,12 +99,12 @@ const (
 	defaultSSHPort = 22
 	defaultSSHUser = "root"
 
-	flagWaitOnError                = "hetzner-wait-on-error"
-	defaultWaitOnError             = 0
-	flagWaitOnPolling              = "hetzner-wait-on-polling"
-	defaultWaitOnPolling           = 1
-	flagWaitForRunningTimeout      = "hetzner-wait-for-running-timeout"
-	defaultWaitForRunningTimeout   = 0
+	flagWaitOnError              = "hetzner-wait-on-error"
+	defaultWaitOnError           = 0
+	flagWaitOnPolling            = "hetzner-wait-on-polling"
+	defaultWaitOnPolling         = 1
+	flagWaitForRunningTimeout    = "hetzner-wait-for-running-timeout"
+	defaultWaitForRunningTimeout = 0
 
 	legacyFlagUserDataFromFile = "hetzner-user-data-from-file"
 	legacyFlagDisablePublic4   = "hetzner-disable-public-4"
@@ -608,9 +608,6 @@ func (d *Driver) Start() error {
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
 	}
-	if srv == nil {
-		return errors.New("server not found")
-	}
 
 	act, _, err := d.getClient().Server.Poweron(context.Background(), srv)
 	if err != nil {
@@ -628,9 +625,6 @@ func (d *Driver) Stop() error {
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
 	}
-	if srv == nil {
-		return errors.New("server not found")
-	}
 
 	act, _, err := d.getClient().Server.Shutdown(context.Background(), srv)
 	if err != nil {
@@ -647,9 +641,6 @@ func (d *Driver) Kill() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
-	}
-	if srv == nil {
-		return errors.New("server not found")
 	}
 
 	act, _, err := d.getClient().Server.Poweroff(context.Background(), srv)

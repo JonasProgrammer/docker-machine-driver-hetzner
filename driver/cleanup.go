@@ -42,7 +42,7 @@ func (d *Driver) destroyServer() error {
 		return nil
 	}
 
-	srv, err := d.getServerHandle()
+	srv, err := d.getServerHandleNullable()
 	if err != nil {
 		return errors.Wrap(err, "could not get server handle")
 	}
