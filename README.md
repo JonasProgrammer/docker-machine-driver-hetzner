@@ -91,14 +91,14 @@ $ docker-machine create \
 ## Options
 
 - `--hetzner-api-token`: **required**. Your project-specific access token for the Hetzner Cloud API.
-- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (currently defaults to `ubuntu-20.04`). *Explicitly specifying an image is **strongly** recommended and will be **required from v6 onwards***.
+- `--hetzner-image`: The name (or ID) of the Hetzner Cloud image to use, see [Images API](https://docs.hetzner.cloud/#images-get-all-images) for how to get a list (currently defaults to `ubuntu-20.04`). *Explicitly specifying an image is **strongly** recommended and will be **required from v6 onwards***.
 - `--hetzner-image-arch`: The architecture to use during image lookup, inferred from the server type if not explicitly given.
-- `--hetzner-image-id`: The id of the Hetzner cloud image (or snapshot) to use, see [Images API](https://docs.hetzner.cloud/#resources-images-get) for how to get a list (mutually excludes `--hetzner-image`).
-- `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](https://docs.hetzner.cloud/#resources-server-types-get) for how to get a list (defaults to `cx11`).
-- `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#resources-locations-get) for how to get a list.
+- `--hetzner-image-id`: The id of the Hetzner cloud image (or snapshot) to use, see [Images API](https://docs.hetzner.cloud/#images-get-all-images) for how to get a list (mutually excludes `--hetzner-image`).
+- `--hetzner-server-type`: The type of the Hetzner Cloud server, see [Server Types API](hhttps://docs.hetzner.cloud/#server-types-get-all-server-types) for how to get a list (defaults to `cx11`).
+- `--hetzner-server-location`: The location to create the server in, see [Locations API](https://docs.hetzner.cloud/#locations-get-all-locations) for how to get a list.
 - `--hetzner-existing-key-path`: Use an existing (local) SSH key instead of generating a new keypair. If a remote key with a matching fingerprint exists, it will be used as if specified using `--hetzner-existing-key-id`, rather than uploading a new key.
 - `--hetzner-existing-key-id`: **requires `--hetzner-existing-key-path`**. Use an existing (remote) SSH key instead of uploading the imported key pair,
-  see [SSH Keys API](https://docs.hetzner.cloud/#resources-ssh-keys-get) for how to get a list
+  see [SSH Keys API](https://docs.hetzner.cloud/#ssh-keys-get-all-ssh-keys) for how to get a list
 - `--hetzner-additional-key`: Upload an additional public key associated with the server, or associate an existing one with the same fingerprint. Can be specified multiple times.
 - `--hetzner-user-data`: Cloud-init based data, passed inline as-is.
 - `--hetzner-user-data-file`: Cloud-init based data, read from passed file.
@@ -117,6 +117,11 @@ $ docker-machine create \
 - `--hetzner-wait-on-error`: Amount of seconds to wait on server creation failure (0/no wait by default)
 - `--hetzner-wait-on-polling`: Amount of seconds to wait between requests when waiting for some state to change. (Default: 1 second)
 - `--hetzner-wait-for-running-timeout`: Max amount of seconds to wait until a machine is running. (Default: 0/no timeout)
+
+Please beware, that for options referring to entities by name, such as server locations and types, the names used by the API may differ from the ones
+shown in the server creation UI. If server creation fails due to a failure to resolve such issues, try another variant of the name (e.g. lowercase,
+kebab-case). As of writing, server types use lowercase (i.e. `cx21` instead of `CX21`) and locations use a three-letter abbreviation suffixed by 1
+(i.e. `fsn1` instead of `Falkenstein`).
 
 #### Image selection
 
