@@ -70,7 +70,7 @@ func (d *Driver) createRemoteKeys() error {
 			return errors.Wrap(err, "could not read ssh public key")
 		}
 
-		key, err := d.getRemoteKeyWithSameFingerprint(buf)
+		key, err := d.getRemoteKeyWithSameFingerprintNullable(buf)
 		if err != nil {
 			return errors.Wrap(err, "error retrieving potentially existing key")
 		}
@@ -89,7 +89,7 @@ func (d *Driver) createRemoteKeys() error {
 		d.KeyID = key.ID
 	}
 	for i, pubkey := range d.AdditionalKeys {
-		key, err := d.getRemoteKeyWithSameFingerprint([]byte(pubkey))
+		key, err := d.getRemoteKeyWithSameFingerprintNullable([]byte(pubkey))
 		if err != nil {
 			return errors.Wrapf(err, "error checking for existing key for %v", pubkey)
 		}

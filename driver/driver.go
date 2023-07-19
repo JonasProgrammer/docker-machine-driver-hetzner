@@ -425,7 +425,7 @@ func (d *Driver) PreCreateCheck() error {
 		return errors.Wrap(err, "could not get image")
 	}
 
-	if _, err := d.getLocation(); err != nil {
+	if _, err := d.getLocationNullable(); err != nil {
 		return errors.Wrap(err, "could not get location")
 	}
 
@@ -563,7 +563,7 @@ func (d *Driver) Remove() error {
 
 	// failure to remove a server-specific key is a hard error
 	if !d.IsExistingKey && d.KeyID != 0 {
-		key, err := d.getKey()
+		key, err := d.getKeyNullable()
 		if err != nil {
 			return errors.Wrap(err, "could not get ssh key")
 		}

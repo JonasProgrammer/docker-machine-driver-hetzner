@@ -72,7 +72,7 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 	}
 	srvopts.Volumes = volumes
 
-	if srvopts.Location, err = d.getLocation(); err != nil {
+	if srvopts.Location, err = d.getLocationNullable(); err != nil {
 		return nil, errors.Wrap(err, "could not get location")
 	}
 	if srvopts.ServerType, err = d.getType(); err != nil {

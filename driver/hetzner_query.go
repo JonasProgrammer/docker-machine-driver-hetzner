@@ -14,9 +14,12 @@ func (d *Driver) getClient() *hcloud.Client {
 	return hcloud.NewClient(hcloud.WithToken(d.AccessToken), hcloud.WithApplication("docker-machine-driver", d.version))
 }
 
-func (d *Driver) getLocation() (*hcloud.Location, error) {
+func (d *Driver) getLocationNullable() (*hcloud.Location, error) {
 	if d.cachedLocation != nil {
 		return d.cachedLocation, nil
+	}
+	if d.Location == "" {
+		return nil, nil
 	}
 
 	location, _, err := d.getClient().Location.GetByName(context.Background(), d.Location)
@@ -95,6 +98,17 @@ func (d *Driver) getImageArchitectureForLookup() (hcloud.Architecture, error) {
 }
 
 func (d *Driver) getKey() (*hcloud.SSHKey, error) {
+	key, err := d.getKeyNullable()
+	if err != nil {
+		return nil, err
+	}
+	if key == nil {
+		return nil, fmt.Errorf("key not found: %v", d.KeyID)
+	}
+	return key, err
+}
+
+func (d *Driver) getKeyNullable() (*hcloud.SSHKey, error) {
 	if d.cachedKey != nil {
 		return d.cachedKey, nil
 	}
@@ -103,14 +117,11 @@ func (d *Driver) getKey() (*hcloud.SSHKey, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get sshkey by ID")
 	}
-	if key == nil {
-		return nil, fmt.Errorf("key not found: %v", d.KeyID)
-	}
 	d.cachedKey = key
 	return instrumented(key), nil
 }
 
-func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud.SSHKey, error) {
+func (d *Driver) getRemoteKeyWithSameFingerprintNullable(publicKeyBytes []byte) (*hcloud.SSHKey, error) {
 	publicKey, _, _, _, err := ssh.ParseAuthorizedKey(publicKeyBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not parse ssh public key")
@@ -121,9 +132,6 @@ func (d *Driver) getRemoteKeyWithSameFingerprint(publicKeyBytes []byte) (*hcloud
 	remoteKey, _, err := d.getClient().SSHKey.GetByFingerprint(context.Background(), fp)
 	if err != nil {
 		return remoteKey, errors.Wrap(err, "could not get sshkey by fingerprint")
-	}
-	if remoteKey == nil {
-		return nil, fmt.Errorf("key not found by fingerprint: %v", fp)
 	}
 	return instrumented(remoteKey), nil
 }
