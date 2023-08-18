@@ -3,7 +3,7 @@ package driver
 import (
 	"context"
 	"github.com/docker/machine/libmachine/state"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"github.com/pkg/errors"
 	"os"
 	"time"

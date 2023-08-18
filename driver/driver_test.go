@@ -3,8 +3,9 @@ package driver
 import (
 	"github.com/docker/machine/commands/commandstest"
 	"github.com/docker/machine/libmachine/drivers"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -212,7 +213,7 @@ func TestImageFlagExclusions(t *testing.T) {
 	// both id and name given
 	d := NewDriver("test")
 	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
-		flagImageID: 42,
+		flagImageID: "42",
 		flagImage:   "answer",
 	}))
 	assertMutualExclusion(t, err, flagImageID, flagImage)
@@ -220,7 +221,7 @@ func TestImageFlagExclusions(t *testing.T) {
 	// both id and arch given
 	d = NewDriver("test")
 	err = d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
-		flagImageID:   42,
+		flagImageID:   "42",
 		flagImageArch: string(hcloud.ArchitectureX86),
 	}))
 	assertMutualExclusion(t, err, flagImageID, flagImageArch)
@@ -252,6 +253,32 @@ func TestImageArch(t *testing.T) {
 	}))
 	if err == nil {
 		t.Fatal("expected error, but invalid arch was accepted")
+	}
+}
+
+func TestBogusId(t *testing.T) {
+	d := NewDriver("test")
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImageID: "answer",
+	}))
+	if err == nil {
+		t.Fatal("expected error, but invalid arch was accepted")
+	}
+}
+
+func TestLongId(t *testing.T) {
+	var testId int64 = 79871865169581
+
+	d := NewDriver("test")
+	err := d.setConfigFromFlagsImpl(makeFlags(map[string]interface{}{
+		flagImageID: strconv.FormatInt(testId, 10),
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
+	}
+
+	if d.ImageID != testId {
+		t.Errorf("expected %v id, but got %v", testId, d.ImageArch)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnutils"
 	mcnssh "github.com/docker/machine/libmachine/ssh"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	"os"

@@ -15,8 +15,8 @@ You can find sources and pre-compiled binaries [here](https://github.com/JonasPr
 
 ```bash
 # Download the binary (this example downloads the binary for linux amd64)
-$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/4.1.2/docker-machine-driver-hetzner_4.1.2_linux_amd64.tar.gz
-$ tar -xvf docker-machine-driver-hetzner_4.1.2_linux_amd64.tar.gz
+$ wget https://github.com/JonasProgrammer/docker-machine-driver-hetzner/releases/download/5.0.0/docker-machine-driver-hetzner_5.0.0_linux_amd64.tar.gz
+$ tar -xvf docker-machine-driver-hetzner_5.0.0_linux_amd64.tar.gz
 
 # Make it executable and copy the binary in a directory accessible with your $PATH
 $ chmod +x docker-machine-driver-hetzner
@@ -259,16 +259,27 @@ $ docker-machine create --driver hetzner
 
 ### 4.0.0
 
-* **check log output for BREAKING-V5**
+* **check log output for BREAKING-V6** (previously *BREAKING-V5*)
 * `--hetzner-user-data-from-file` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-flag-user-data-file` should be used instead.
 * `--hetzner-disable-public-4`/`--hetzner-disable-public-6` will be fully deprecated and its flag description will only read 'DEPRECATED, legacy'; current fallback behaviour will be retained. `--hetzner-disable-public-ipv4`/`--hetzner-disable-public-ipv6` should be used instead.
 
 ### 5.0.0
 
+* major update due to #108 ([hetznercloud/hcloud-go#263](https://github.com/hetznercloud/hcloud-go/v2/issues/263))
+* new `hcloud-go` v2 requiring int64 IDs is used for interaction with Hetzner cloud
+* old configs should be forward-compatible
+* newly created machines may now use 64-bit integers in all stored and transmitted data, potentially breaking existing tools supporting 32-bit only
+  - this includes anything interacting with the flags CLI via RPC, as `mcnflags` lacks an int64 flag type, so `StringFlag` and parsing are used now
+* previous changes were moved one version (i.e. 5 -> 6, 6 -> 7)
+
+### 6.0.0
+
+* *moved from 5.0.0*
 * `--hetzner-user-data-from-file` will be removed entirely, including its fallback behavior
 * `--hetzner-disable-public-4`/`--hetzner-disable-public-6` ill be removed entirely, including their fallback behavior
 * not specifying `--hetzner-image` will generate a warning stating 'use of default image is DEPRECATED'
 
-### 6.0.0
+### 7.0.0
 
+* *moved from 6.0.0*
 * specifying `--hetzner-image` will be mandatory, and a default image will no longer be provided

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnflag"
 	"github.com/docker/machine/libmachine/state"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"github.com/pkg/errors"
 )
 
@@ -20,19 +21,19 @@ type Driver struct {
 
 	AccessToken       string
 	Image             string
-	ImageID           int
+	ImageID           int64
 	ImageArch         hcloud.Architecture
 	cachedImage       *hcloud.Image
 	Type              string
 	cachedType        *hcloud.ServerType
 	Location          string
 	cachedLocation    *hcloud.Location
-	KeyID             int
+	KeyID             int64
 	cachedKey         *hcloud.SSHKey
 	IsExistingKey     bool
 	originalKey       string
 	dangling          []func()
-	ServerID          int
+	ServerID          int64
 	cachedServer      *hcloud.Server
 	userData          string
 	userDataFile      string
@@ -52,7 +53,7 @@ type Driver struct {
 	cachedPGrp        *hcloud.PlacementGroup
 
 	AdditionalKeys       []string
-	AdditionalKeyIDs     []int
+	AdditionalKeyIDs     []int64
 	cachedAdditionalKeys []*hcloud.SSHKey
 
 	WaitOnError           int
@@ -146,7 +147,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Image to use for server creation",
 			Value:  "",
 		},
-		mcnflag.IntFlag{
+		mcnflag.StringFlag{
 			EnvVar: "HETZNER_IMAGE_ID",
 			Name:   flagImageID,
 			Usage:  "Image to use for server creation",
@@ -168,11 +169,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Location to create machine at",
 			Value:  "",
 		},
-		mcnflag.IntFlag{
+		mcnflag.StringFlag{
 			EnvVar: "HETZNER_EXISTING_KEY_ID",
 			Name:   flagExKeyID,
 			Usage:  "Existing key ID to use for server; requires --hetzner-existing-key-path",
-			Value:  0,
+			Value:  "0",
 		},
 		mcnflag.StringFlag{
 			EnvVar: "HETZNER_EXISTING_KEY_PATH",
@@ -319,6 +320,20 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	}
 }
 
+func flagI64(opts drivers.DriverOptions, key string) (int64, error) {
+	raw := opts.String(key)
+	if raw == "" {
+		return 0, nil
+	}
+
+	ret, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "could not parse int64 for %v", key)
+	}
+
+	return ret, nil
+}
+
 // SetConfigFromFlags handles additional driver arguments as retrieved by [Driver.GetCreateFlags];
 // see [drivers.Driver.SetConfigFromFlags]
 func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
@@ -326,16 +341,24 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 }
 
 func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
+	var err error
+
 	d.AccessToken = opts.String(flagAPIToken)
 	d.Image = opts.String(flagImage)
-	d.ImageID = opts.Int(flagImageID)
-	err := d.setImageArch(opts.String(flagImageArch))
+	d.ImageID, err = flagI64(opts, flagImageID)
+	if err != nil {
+		return err
+	}
+	err = d.setImageArch(opts.String(flagImageArch))
 	if err != nil {
 		return err
 	}
 	d.Location = opts.String(flagLocation)
 	d.Type = opts.String(flagType)
-	d.KeyID = opts.Int(flagExKeyID)
+	d.KeyID, err = flagI64(opts, flagExKeyID)
+	if err != nil {
+		return err
+	}
 	d.IsExistingKey = d.KeyID != 0
 	d.originalKey = opts.String(flagExKeyPath)
 	err = d.setUserDataFlags(opts)
@@ -390,10 +413,10 @@ func (d *Driver) setConfigFromFlagsImpl(opts drivers.DriverOptions) error {
 	instrumented(d)
 
 	if d.usesDfr {
-		log.Warn("!!!! BREAKING-V5 !!!!")
+		log.Warn("!!!! BREAKING-V6 !!!!")
 		log.Warn("your configuration uses deprecated flags and will stop working as-is from v5 onwards")
 		log.Warn("check preceding output for 'DEPRECATED' log statements")
-		log.Warn("!!!! /BREAKING-V5 !!!!")
+		log.Warn("!!!! /BREAKING-V6 !!!!")
 	}
 
 	return nil
