@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/docker/machine v0.16.2
-	github.com/hetznercloud/hcloud-go/v2 v2.1.1
+	github.com/hetznercloud/hcloud-go/v2 v2.2.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/crypto v0.12.0
 )
