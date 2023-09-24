@@ -11,7 +11,15 @@ import (
 )
 
 func (d *Driver) getClient() *hcloud.Client {
-	return hcloud.NewClient(hcloud.WithToken(d.AccessToken), hcloud.WithApplication("docker-machine-driver", d.version))
+	opts := []hcloud.ClientOption{
+		hcloud.WithToken(d.AccessToken),
+		hcloud.WithApplication("docker-machine-driver", d.version),
+		hcloud.WithPollBackoffFunc(hcloud.ConstantBackoff(time.Duration(d.WaitOnPolling) * time.Second)),
+	}
+
+	opts = d.setupClientInstrumentation(opts)
+
+	return hcloud.NewClient(opts...)
 }
 
 func (d *Driver) getLocationNullable() (*hcloud.Location, error) {
@@ -166,25 +174,24 @@ func (d *Driver) getServerHandleNullable() (*hcloud.Server, error) {
 }
 
 func (d *Driver) waitForAction(a *hcloud.Action) error {
-	for {
-		act, _, err := d.getClient().Action.GetByID(context.Background(), a.ID)
-		if err != nil {
-			return errors.Wrap(err, "could not get client by ID")
-		}
-		if act == nil {
-			return fmt.Errorf("action not found: %v", a.ID)
-		}
+	progress, done := d.getClient().Action.WatchProgress(context.Background(), a)
 
-		if act.Status == hcloud.ActionStatusSuccess {
-			log.Debugf(" -> finished %s[%d]", act.Command, act.ID)
-			break
-		} else if act.Status == hcloud.ActionStatusRunning {
-			log.Debugf(" -> %s[%d]: %d %%", act.Command, act.ID, act.Progress)
-		} else if act.Status == hcloud.ActionStatusError {
-			return act.Error()
-		}
+	running := true
+	var ret error
 
-		time.Sleep(time.Duration(d.WaitOnPolling) * time.Second)
+	for running {
+		select {
+		case <-done:
+			ret = <-done
+			running = false
+		case <-progress:
+			log.Debugf(" -> %s[%d]: %d %%", a.Command, a.ID, <-progress)
+		}
 	}
-	return nil
+
+	if ret == nil {
+		log.Debugf(" -> finished %s[%d]", a.Command, a.ID)
+	}
+
+	return ret
 }
