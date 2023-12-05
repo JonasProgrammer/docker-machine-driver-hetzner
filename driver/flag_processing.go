@@ -8,6 +8,22 @@ import (
 	"strings"
 )
 
+var legacyDefaultImages = [...]string{
+	defaultImage,
+	"ubuntu-18.04",
+	"ubuntu-16.04",
+	"debian-9",
+}
+
+func isDefaultImageName(imageName string) bool {
+	for _, defaultImage := range legacyDefaultImages {
+		if imageName == defaultImage {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *Driver) setImageArch(arch string) error {
 	switch arch {
 	case "":
@@ -23,7 +39,7 @@ func (d *Driver) setImageArch(arch string) error {
 }
 
 func (d *Driver) verifyImageFlags() error {
-	if d.ImageID != 0 && d.Image != "" && d.Image != defaultImage /* support legacy behaviour */ {
+	if d.ImageID != 0 && d.Image != "" && !isDefaultImageName(d.Image) /* support legacy behaviour */ {
 		return d.flagFailure("--%v and --%v are mutually exclusive", flagImage, flagImageID)
 	} else if d.ImageID != 0 && d.ImageArch != "" {
 		return d.flagFailure("--%v and --%v are mutually exclusive", flagImageArch, flagImageID)
