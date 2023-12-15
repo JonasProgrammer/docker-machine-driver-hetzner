@@ -3,13 +3,13 @@ package driver
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnutils"
 	mcnssh "github.com/docker/machine/libmachine/ssh"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
-	"os"
 )
 
 func (d *Driver) setupExistingKey() error {
@@ -23,23 +23,23 @@ func (d *Driver) setupExistingKey() error {
 
 	key, err := d.getKey()
 	if err != nil {
-		return errors.Wrap(err, "could not get key")
+		return fmt.Errorf("could not get key: %w", err)
 	}
 
 	buf, err := os.ReadFile(d.originalKey + ".pub")
 	if err != nil {
-		return errors.Wrap(err, "could not read public key")
+		return fmt.Errorf("could not read public key: %w", err)
 	}
 
 	// Will also parse `ssh-rsa w309jwf0e39jf asdf` public keys
 	pubk, _, _, _, err := ssh.ParseAuthorizedKey(buf)
 	if err != nil {
-		return errors.Wrap(err, "could not parse authorized key")
+		return fmt.Errorf("could not parse authorized key: %w", err)
 	}
 
 	if key.Fingerprint != ssh.FingerprintLegacyMD5(pubk) &&
 		key.Fingerprint != ssh.FingerprintSHA256(pubk) {
-		return errors.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
+		return fmt.Errorf("remote key %d does not match local key %s", d.KeyID, d.originalKey)
 	}
 
 	return nil
@@ -47,15 +47,15 @@ func (d *Driver) setupExistingKey() error {
 
 func (d *Driver) copySSHKeyPair(src string) error {
 	if err := mcnutils.CopyFile(src, d.GetSSHKeyPath()); err != nil {
-		return errors.Wrap(err, "could not copy ssh key")
+		return fmt.Errorf("could not copy ssh key: %w", err)
 	}
 
 	if err := mcnutils.CopyFile(src+".pub", d.GetSSHKeyPath()+".pub"); err != nil {
-		return errors.Wrap(err, "could not copy ssh public key")
+		return fmt.Errorf("could not copy ssh public key: %w", err)
 	}
 
 	if err := os.Chmod(d.GetSSHKeyPath(), 0600); err != nil {
-		return errors.Wrap(err, "could not set permissions on the ssh key")
+		return fmt.Errorf("could not set permissions on the ssh key: %w", err)
 	}
 
 	return nil
@@ -67,12 +67,12 @@ func (d *Driver) createRemoteKeys() error {
 
 		buf, err := os.ReadFile(d.GetSSHKeyPath() + ".pub")
 		if err != nil {
-			return errors.Wrap(err, "could not read ssh public key")
+			return fmt.Errorf("could not read ssh public key: %w", err)
 		}
 
 		key, err := d.getRemoteKeyWithSameFingerprintNullable(buf)
 		if err != nil {
-			return errors.Wrap(err, "error retrieving potentially existing key")
+			return fmt.Errorf("error retrieving potentially existing key: %w", err)
 		}
 		if key == nil {
 			log.Infof("SSH key not found in Hetzner. Uploading...")
@@ -91,14 +91,14 @@ func (d *Driver) createRemoteKeys() error {
 	for i, pubkey := range d.AdditionalKeys {
 		key, err := d.getRemoteKeyWithSameFingerprintNullable([]byte(pubkey))
 		if err != nil {
-			return errors.Wrapf(err, "error checking for existing key for %v", pubkey)
+			return fmt.Errorf("error checking for existing key for %v: %w", pubkey, err)
 		}
 		if key == nil {
 			log.Infof("Creating new key for %v...", pubkey)
 			key, err = d.makeKey(fmt.Sprintf("%v-additional-%d", d.GetMachineName(), i), pubkey, d.keyLabels)
 
 			if err != nil {
-				return errors.Wrapf(err, "error creating new key for %v", pubkey)
+				return fmt.Errorf("error creating new key for %v: %w", pubkey, err)
 			}
 
 			log.Infof(" -> Created %v", key.ID)
@@ -116,12 +116,12 @@ func (d *Driver) prepareLocalKey() error {
 	if d.originalKey != "" {
 		log.Debugf("Copying SSH key...")
 		if err := d.copySSHKeyPair(d.originalKey); err != nil {
-			return errors.Wrap(err, "could not copy ssh key pair")
+			return fmt.Errorf("could not copy ssh key pair: %w", err)
 		}
 	} else {
 		log.Debugf("Generating SSH key...")
 		if err := mcnssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-			return errors.Wrap(err, "could not generate ssh key")
+			return fmt.Errorf("could not generate ssh key: %w", err)
 		}
 	}
 	return nil
@@ -137,9 +137,9 @@ func (d *Driver) makeKey(name string, pubkey string, labels map[string]string) (
 
 	key, _, err := d.getClient().SSHKey.Create(context.Background(), instrumented(keyopts))
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create ssh key")
+		return nil, fmt.Errorf("could not create ssh key: %w", err)
 	} else if key == nil {
-		return nil, errors.Errorf("key upload did not return an error, but key was nil")
+		return nil, fmt.Errorf("key upload did not return an error, but key was nil")
 	}
 
 	d.dangling = append(d.dangling, func() {

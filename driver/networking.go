@@ -3,11 +3,11 @@ package driver
 import (
 	"context"
 	"fmt"
-	"github.com/docker/machine/libmachine/log"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/pkg/errors"
 	"net"
 	"time"
+
+	"github.com/docker/machine/libmachine/log"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
 func (d *Driver) getPrimaryIPv4() (*hcloud.PrimaryIP, error) {
@@ -87,7 +87,7 @@ func (d *Driver) configureNetworkAccess(srv hcloud.ServerCreateResult) error {
 			log.Infof("Wait until private network attached ...")
 			server, _, err := d.getClient().Server.GetByID(context.Background(), srv.Server.ID)
 			if err != nil {
-				return errors.Wrapf(err, "could not get newly created server [%d]", srv.Server.ID)
+				return fmt.Errorf("could not get newly created server [%d]: %w", srv.Server.ID, err)
 			}
 			if server.PrivateNet != nil {
 				d.IPAddress = server.PrivateNet[0].IP.String()

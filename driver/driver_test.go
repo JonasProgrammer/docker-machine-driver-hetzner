@@ -1,13 +1,14 @@
 package driver
 
 import (
-	"github.com/docker/machine/commands/commandstest"
-	"github.com/docker/machine/libmachine/drivers"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/docker/machine/commands/commandstest"
+	"github.com/docker/machine/libmachine/drivers"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
 var defaultFlags = map[string]interface{}{

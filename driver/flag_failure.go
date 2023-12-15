@@ -3,12 +3,13 @@
 package driver
 
 import (
+	"fmt"
+
 	"github.com/docker/machine/libmachine/drivers"
-	"github.com/pkg/errors"
 )
 
 func (d *Driver) flagFailure(format string, args ...interface{}) error {
-	return errors.Errorf(format, args...)
+	return fmt.Errorf(format, args...)
 }
 
 func (d *Driver) setConfigFromFlags(opts drivers.DriverOptions) error {

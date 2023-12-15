@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/docker/machine v0.16.2
 	github.com/hetznercloud/hcloud-go/v2 v2.5.1
-	github.com/pkg/errors v0.9.1
 	golang.org/x/crypto v0.16.0
 )
 

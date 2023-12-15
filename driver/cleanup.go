@@ -3,9 +3,9 @@ package driver
 import (
 	"context"
 	"fmt"
+
 	"github.com/docker/machine/libmachine/log"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/pkg/errors"
 )
 
 func (d *Driver) destroyDangling() {
@@ -44,7 +44,7 @@ func (d *Driver) destroyServer() error {
 
 	srv, err := d.getServerHandleNullable()
 	if err != nil {
-		return errors.Wrap(err, "could not get server handle")
+		return fmt.Errorf("could not get server handle: %w", err)
 	}
 
 	if srv == nil {
@@ -54,7 +54,7 @@ func (d *Driver) destroyServer() error {
 
 		res, _, err := d.getClient().Server.DeleteWithResult(context.Background(), srv)
 		if err != nil {
-			return errors.Wrap(err, "could not delete server")
+			return fmt.Errorf("could not delete server: %w", err)
 		}
 
 		// failure to remove a placement group is not a hard error
@@ -64,7 +64,7 @@ func (d *Driver) destroyServer() error {
 
 		// wait for the server to actually be deleted
 		if err = d.waitForAction(res.Action); err != nil {
-			return errors.Wrap(err, "could not wait for deletion")
+			return fmt.Errorf("could not wait for deletion: %w", err)
 		}
 	}
 

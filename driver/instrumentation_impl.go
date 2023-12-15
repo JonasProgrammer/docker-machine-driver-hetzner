@@ -4,9 +4,10 @@ package driver
 
 import (
 	"encoding/json"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"os"
 	"runtime/debug"
+
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 
 	"github.com/docker/machine/libmachine/log"
 )

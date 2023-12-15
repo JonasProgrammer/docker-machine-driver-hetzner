@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"fmt"
+
 	"github.com/docker/machine/libmachine/log"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )

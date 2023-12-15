@@ -2,11 +2,12 @@ package driver
 
 import (
 	"context"
-	"github.com/docker/machine/libmachine/state"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/pkg/errors"
+	"fmt"
 	"os"
 	"time"
+
+	"github.com/docker/machine/libmachine/state"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
 func (d *Driver) waitForRunningServer() error {
@@ -14,7 +15,7 @@ func (d *Driver) waitForRunningServer() error {
 	for {
 		srvstate, err := d.GetState()
 		if err != nil {
-			return errors.Wrap(err, "could not get state")
+			return fmt.Errorf("could not get state: %w", err)
 		}
 
 		if srvstate == state.Running {
@@ -23,7 +24,7 @@ func (d *Driver) waitForRunningServer() error {
 
 		elapsed_time := time.Since(start_time).Seconds()
 		if d.WaitForRunningTimeout > 0 && int(elapsed_time) > d.WaitForRunningTimeout {
-			return errors.Errorf("server exceeded wait-for-running-timeout.")
+			return fmt.Errorf("server exceeded wait-for-running-timeout")
 		}
 
 		time.Sleep(time.Duration(d.WaitOnPolling) * time.Second)
@@ -73,17 +74,17 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 	srvopts.Volumes = volumes
 
 	if srvopts.Location, err = d.getLocationNullable(); err != nil {
-		return nil, errors.Wrap(err, "could not get location")
+		return nil, fmt.Errorf("could not get location: %w", err)
 	}
 	if srvopts.ServerType, err = d.getType(); err != nil {
-		return nil, errors.Wrap(err, "could not get type")
+		return nil, fmt.Errorf("could not get type: %w", err)
 	}
 	if srvopts.Image, err = d.getImage(); err != nil {
-		return nil, errors.Wrap(err, "could not get image")
+		return nil, fmt.Errorf("could not get image: %w", err)
 	}
 	key, err := d.getKey()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get ssh key")
+		return nil, fmt.Errorf("could not get ssh key: %w", err)
 	}
 	srvopts.SSHKeys = append(d.cachedAdditionalKeys, key)
 	return &srvopts, nil
@@ -107,10 +108,10 @@ func (d *Driver) createNetworks() ([]*hcloud.Network, error) {
 	for _, networkIDorName := range d.Networks {
 		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not get network by ID or name")
+			return nil, fmt.Errorf("could not get network by ID or name: %w", err)
 		}
 		if network == nil {
-			return nil, errors.Errorf("network '%s' not found", networkIDorName)
+			return nil, fmt.Errorf("network '%s' not found", networkIDorName)
 		}
 		networks = append(networks, network)
 	}
@@ -122,10 +123,10 @@ func (d *Driver) createFirewalls() ([]*hcloud.ServerCreateFirewall, error) {
 	for _, firewallIDorName := range d.Firewalls {
 		firewall, _, err := d.getClient().Firewall.Get(context.Background(), firewallIDorName)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not get firewall by ID or name")
+			return nil, fmt.Errorf("could not get firewall by ID or name: %w", err)
 		}
 		if firewall == nil {
-			return nil, errors.Errorf("firewall '%s' not found", firewallIDorName)
+			return nil, fmt.Errorf("firewall '%s' not found", firewallIDorName)
 		}
 		firewalls = append(firewalls, &hcloud.ServerCreateFirewall{Firewall: *firewall})
 	}
@@ -137,10 +138,10 @@ func (d *Driver) createVolumes() ([]*hcloud.Volume, error) {
 	for _, volumeIDorName := range d.Volumes {
 		volume, _, err := d.getClient().Volume.Get(context.Background(), volumeIDorName)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not get volume by ID or name")
+			return nil, fmt.Errorf("could not get volume by ID or name: %w", err)
 		}
 		if volume == nil {
-			return nil, errors.Errorf("volume '%s' not found", volumeIDorName)
+			return nil, fmt.Errorf("volume '%s' not found", volumeIDorName)
 		}
 		volumes = append(volumes, volume)
 	}

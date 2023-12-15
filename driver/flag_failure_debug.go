@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/docker/machine/libmachine/drivers"
-	"github.com/pkg/errors"
 )
 
 var lastOpts drivers.DriverOptions
@@ -23,7 +22,7 @@ func (d *Driver) flagFailure(format string, args ...interface{}) error {
 	}
 
 	combined := append([]interface{}{line1, line2}, args...)
-	return errors.Errorf("%s\n%s\n"+format, combined...)
+	return fmt.Errorf("%s\n%s\n"+format, combined...)
 }
 
 func (d *Driver) setConfigFromFlags(opts drivers.DriverOptions) error {

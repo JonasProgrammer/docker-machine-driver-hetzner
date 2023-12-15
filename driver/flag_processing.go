@@ -1,11 +1,12 @@
 package driver
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/pkg/errors"
-	"strings"
 )
 
 var legacyDefaultImages = [...]string{
@@ -33,7 +34,7 @@ func (d *Driver) setImageArch(arch string) error {
 	case string(hcloud.ArchitectureX86):
 		d.ImageArch = hcloud.ArchitectureX86
 	default:
-		return errors.Errorf("unknown architecture %v", arch)
+		return fmt.Errorf("unknown architecture %v", arch)
 	}
 	return nil
 }
@@ -112,7 +113,7 @@ func (d *Driver) setLabelsFromFlags(opts drivers.DriverOptions) error {
 	for _, label := range opts.StringSlice(flagKeyLabel) {
 		split := strings.SplitN(label, "=", 2)
 		if len(split) != 2 {
-			return errors.Errorf("key label %v is not in key=value format", label)
+			return fmt.Errorf("key label %v is not in key=value format", label)
 		}
 		d.keyLabels[split[0]] = split[1]
 	}

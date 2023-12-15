@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -12,7 +13,6 @@ import (
 	"github.com/docker/machine/libmachine/mcnflag"
 	"github.com/docker/machine/libmachine/state"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/pkg/errors"
 )
 
 // Driver contains hetzner-specific data to implement [drivers.Driver]
@@ -328,7 +328,7 @@ func flagI64(opts drivers.DriverOptions, key string) (int64, error) {
 
 	ret, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
-		return 0, errors.Wrapf(err, "could not parse int64 for %v", key)
+		return 0, fmt.Errorf("could not parse int64 for %v: %w", key, err)
 	}
 
 	return ret, nil
@@ -439,17 +439,17 @@ func (d *Driver) PreCreateCheck() error {
 	}
 
 	if serverType, err := d.getType(); err != nil {
-		return errors.Wrap(err, "could not get type")
+		return fmt.Errorf("could not get type: %w", err)
 	} else if d.ImageArch != "" && serverType.Architecture != d.ImageArch {
 		log.Warnf("supplied architecture %v differs from server architecture %v", d.ImageArch, serverType.Architecture)
 	}
 
 	if _, err := d.getImage(); err != nil {
-		return errors.Wrap(err, "could not get image")
+		return fmt.Errorf("could not get image: %w", err)
 	}
 
 	if _, err := d.getLocationNullable(); err != nil {
-		return errors.Wrap(err, "could not get location")
+		return fmt.Errorf("could not get location: %w", err)
 	}
 
 	if _, err := d.getPlacementGroup(); err != nil {
@@ -465,7 +465,7 @@ func (d *Driver) PreCreateCheck() error {
 	}
 
 	if d.UsePrivateNetwork && len(d.Networks) == 0 {
-		return errors.Errorf("No private network attached.")
+		return fmt.Errorf("no private network attached")
 	}
 
 	return nil
@@ -494,12 +494,12 @@ func (d *Driver) Create() error {
 	srv, _, err := d.getClient().Server.Create(context.Background(), instrumented(*srvopts))
 	if err != nil {
 		time.Sleep(time.Duration(d.WaitOnError) * time.Second)
-		return errors.Wrap(err, "could not create server")
+		return fmt.Errorf("could not create server: %w", err)
 	}
 
 	log.Infof(" -> Creating server %s[%d] in %s[%d]", srv.Server.Name, srv.Server.ID, srv.Action.Command, srv.Action.ID)
 	if err = d.waitForAction(srv.Action); err != nil {
-		return errors.Wrap(err, "could not wait for action")
+		return fmt.Errorf("could not wait for action: %w", err)
 	}
 
 	d.ServerID = srv.Server.ID
@@ -530,12 +530,12 @@ func (d *Driver) GetSSHHostname() (string, error) {
 // GetURL retrieves the URL of the docker daemon on the machine; see [drivers.Driver.GetURL]
 func (d *Driver) GetURL() (string, error) {
 	if err := drivers.MustBeRunning(d); err != nil {
-		return "", errors.Wrap(err, "could not execute drivers.MustBeRunning")
+		return "", fmt.Errorf("could not execute drivers.MustBeRunning: %w", err)
 	}
 
 	ip, err := d.GetIP()
 	if err != nil {
-		return "", errors.Wrap(err, "could not get IP")
+		return "", fmt.Errorf("could not get IP: %w", err)
 	}
 
 	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, "2376")), nil
@@ -545,7 +545,7 @@ func (d *Driver) GetURL() (string, error) {
 func (d *Driver) GetState() (state.State, error) {
 	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
 	if err != nil {
-		return state.None, errors.Wrap(err, "could not get server by ID")
+		return state.None, fmt.Errorf("could not get server by ID: %w", err)
 	}
 	if srv == nil {
 		return state.None, errors.New("server not found")
@@ -588,7 +588,7 @@ func (d *Driver) Remove() error {
 	if !d.IsExistingKey && d.KeyID != 0 {
 		key, err := d.getKeyNullable()
 		if err != nil {
-			return errors.Wrap(err, "could not get ssh key")
+			return fmt.Errorf("could not get ssh key: %w", err)
 		}
 		if key == nil {
 			log.Infof(" -> SSH key does not exist anymore")
@@ -598,7 +598,7 @@ func (d *Driver) Remove() error {
 		log.Infof(" -> Destroying SSHKey %s[%d]...", key.Name, key.ID)
 
 		if _, err := d.getClient().SSHKey.Delete(context.Background(), key); err != nil {
-			return errors.Wrap(err, "could not delete ssh key")
+			return fmt.Errorf("could not delete ssh key: %w", err)
 		}
 	}
 
@@ -609,7 +609,7 @@ func (d *Driver) Remove() error {
 func (d *Driver) Restart() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
-		return errors.Wrap(err, "could not get server handle")
+		return fmt.Errorf("could not get server handle: %w", err)
 	}
 	if srv == nil {
 		return errors.New("server not found")
@@ -617,7 +617,7 @@ func (d *Driver) Restart() error {
 
 	act, _, err := d.getClient().Server.Reboot(context.Background(), srv)
 	if err != nil {
-		return errors.Wrap(err, "could not reboot server")
+		return fmt.Errorf("could not reboot server: %w", err)
 	}
 
 	log.Infof(" -> Rebooting server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -629,12 +629,12 @@ func (d *Driver) Restart() error {
 func (d *Driver) Start() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
-		return errors.Wrap(err, "could not get server handle")
+		return fmt.Errorf("could not get server handle: %w", err)
 	}
 
 	act, _, err := d.getClient().Server.Poweron(context.Background(), srv)
 	if err != nil {
-		return errors.Wrap(err, "could not power on server")
+		return fmt.Errorf("could not power on server: %w", err)
 	}
 
 	log.Infof(" -> Starting server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -646,12 +646,12 @@ func (d *Driver) Start() error {
 func (d *Driver) Stop() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
-		return errors.Wrap(err, "could not get server handle")
+		return fmt.Errorf("could not get server handle: %w", err)
 	}
 
 	act, _, err := d.getClient().Server.Shutdown(context.Background(), srv)
 	if err != nil {
-		return errors.Wrap(err, "could not shutdown server")
+		return fmt.Errorf("could not shutdown server: %w", err)
 	}
 
 	log.Infof(" -> Shutting down server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
@@ -663,12 +663,12 @@ func (d *Driver) Stop() error {
 func (d *Driver) Kill() error {
 	srv, err := d.getServerHandle()
 	if err != nil {
-		return errors.Wrap(err, "could not get server handle")
+		return fmt.Errorf("could not get server handle: %w", err)
 	}
 
 	act, _, err := d.getClient().Server.Poweroff(context.Background(), srv)
 	if err != nil {
-		return errors.Wrap(err, "could not poweroff server")
+		return fmt.Errorf("could not poweroff server: %w", err)
 	}
 
 	log.Infof(" -> Powering off server %s[%d] in %s[%d]...", srv.Name, srv.ID, act.Command, act.ID)
