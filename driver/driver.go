@@ -505,7 +505,7 @@ func (d *Driver) Create() error {
 	d.ServerID = srv.Server.ID
 	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Server.Name, srv.Server.ID)
 
-	err = d.waitForRunningServer()
+	err = d.waitForInitialStartup(srv)
 	if err != nil {
 		return err
 	}

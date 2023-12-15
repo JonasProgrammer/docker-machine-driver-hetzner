@@ -32,6 +32,16 @@ func (d *Driver) waitForRunningServer() error {
 	return nil
 }
 
+func (d *Driver) waitForInitialStartup(srv hcloud.ServerCreateResult) error {
+	if srv.NextActions != nil && len(srv.NextActions) != 0 {
+		if err := d.waitForMultipleActions("server.NextActions", srv.NextActions); err != nil {
+			return fmt.Errorf("could not wait for NextActions: %w", err)
+		}
+	}
+
+	return d.waitForRunningServer()
+}
+
 func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 	pgrp, err := d.getPlacementGroup()
 	if err != nil {
