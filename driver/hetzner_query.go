@@ -15,7 +15,9 @@ func (d *Driver) getClient() *hcloud.Client {
 	opts := []hcloud.ClientOption{
 		hcloud.WithToken(d.AccessToken),
 		hcloud.WithApplication("docker-machine-driver", d.version),
-		hcloud.WithPollBackoffFunc(hcloud.ConstantBackoff(time.Duration(d.WaitOnPolling) * time.Second)),
+		hcloud.WithPollOpts(hcloud.PollOpts{
+			BackoffFunc: hcloud.ConstantBackoff(time.Duration(d.WaitOnPolling) * time.Second),
+		}),
 	}
 
 	opts = d.setupClientInstrumentation(opts)
@@ -175,20 +177,10 @@ func (d *Driver) getServerHandleNullable() (*hcloud.Server, error) {
 }
 
 func (d *Driver) waitForAction(a *hcloud.Action) error {
-	progress, done := d.getClient().Action.WatchProgress(context.Background(), a)
-
-	running := true
-	var ret error
-
-	for running {
-		select {
-		case <-done:
-			ret = <-done
-			running = false
-		case <-progress:
-			log.Debugf(" -> %s[%d]: %d %%", a.Command, a.ID, <-progress)
-		}
-	}
+	ret := d.getClient().Action.WaitForFunc(context.Background(), func(update *hcloud.Action) error {
+		log.Debugf(" -> %s[%d]: %d %%", update.Command, update.ID, update.Progress)
+		return update.Error()
+	}, a)
 
 	if ret == nil {
 		log.Debugf(" -> finished %s[%d]", a.Command, a.ID)
@@ -200,22 +192,14 @@ func (d *Driver) waitForAction(a *hcloud.Action) error {
 func (d *Driver) waitForMultipleActions(step string, a []*hcloud.Action) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	progress, watchErr := d.getClient().Action.WatchOverallProgress(ctx, a)
-
-	running := true
-	var ret error
-
-	for running {
-		select {
-		case <-watchErr:
-			ret = errors.Join(ret, <-watchErr)
+	ret := d.getClient().Action.WaitForFunc(ctx, func(update *hcloud.Action) error {
+		log.Debugf(" -> %s: %d %%", step, update.Progress)
+		err := update.Error()
+		if err != nil {
 			cancel()
-		case <-progress:
-			log.Debugf(" -> %s: %d %%", step, <-progress)
-		default:
-			running = false
 		}
-	}
+		return err
+	}, a...)
 
 	if ret == nil {
 		log.Debugf(" -> finished %s", step)

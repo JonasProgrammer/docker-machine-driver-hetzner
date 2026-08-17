@@ -305,7 +305,7 @@ func assertMutualExclusion(t *testing.T, err error, flag1, flag2 string) {
 	}
 
 	errstr := err.Error()
-	if !(strings.Contains(errstr, flag1) && strings.Contains(errstr, flag2) && strings.Contains(errstr, "mutually exclusive")) {
+	if !strings.Contains(errstr, flag1) || !strings.Contains(errstr, flag2) || !strings.Contains(errstr, "mutually exclusive") {
 		t.Errorf("expected mutually exclusive flags to fail, but message differs: %v %v %v", flag1, flag2, errstr)
 	}
 }

@@ -33,7 +33,7 @@ func (d *Driver) waitForRunningServer() error {
 }
 
 func (d *Driver) waitForInitialStartup(srv hcloud.ServerCreateResult) error {
-	if srv.NextActions != nil && len(srv.NextActions) != 0 {
+	if len(srv.NextActions) != 0 {
 		if err := d.waitForMultipleActions("server.NextActions", srv.NextActions); err != nil {
 			return fmt.Errorf("could not wait for NextActions: %w", err)
 		}
