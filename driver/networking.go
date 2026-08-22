@@ -85,7 +85,7 @@ func (d *Driver) configureNetworkAccess(srv hcloud.ServerCreateResult) error {
 		for {
 			// we need to wait until network is attached
 			log.Infof("Wait until private network attached ...")
-			server, _, err := d.getClient().Server.GetByID(context.Background(), srv.Server.ID)
+			server, err := d.getServerHandle()
 			if err != nil {
 				return fmt.Errorf("could not get newly created server [%d]: %w", srv.Server.ID, err)
 			}

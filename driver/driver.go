@@ -543,12 +543,9 @@ func (d *Driver) GetURL() (string, error) {
 
 // GetState retrieves the state the machine is currently in; see [drivers.Driver.GetState]
 func (d *Driver) GetState() (state.State, error) {
-	srv, _, err := d.getClient().Server.GetByID(context.Background(), d.ServerID)
+	srv, err := d.getServerHandle()
 	if err != nil {
 		return state.None, fmt.Errorf("could not get server by ID: %w", err)
-	}
-	if srv == nil {
-		return state.None, errors.New("server not found")
 	}
 
 	switch srv.Status {
