@@ -104,7 +104,7 @@ $ docker-machine create \
 - `--hetzner-user-data-file`: Cloud-init based data, read from passed file.
 - `--hetzner-user-data-from-file`: DEPRECATED, use `--hetzner-user-data-file`. Read `--hetzner-user-data` as file name and use contents as user-data.
 - `--hetzner-volumes`: Volume IDs or names which should be attached to the server
-- `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface
+- `--hetzner-networks`: Network IDs or names which should be attached to the server private network interface. Append `:<ip-range>` (e.g. `my-network:10.0.1.0/24`) to place the server in a specific subnet, as documented in [Networking](#networking)
 - `--hetzner-use-private-network`: Use private network
 - `--hetzner-firewalls`: Firewall IDs or names which should be applied on the server
 - `--hetzner-server-label`: `key=value` pairs of additional metadata to assign to the server.
@@ -204,6 +204,18 @@ When disabling all public IPs, `--hetzner-use-private-network` must be given.
 were given.
 Using `--hetzner-use-private-network` implicitly or explicitly requires at least one `--hetzner-network`
 to be given.
+
+To place the server in a specific subnet of a network, append the subnet's IP range to the network, e.g.
+`--hetzner-networks my-network:10.0.1.0/24`. The IP range must be given in network form (e.g. `10.0.1.0/24`, not
+`10.0.1.5/24`) and must exactly match an existing subnet of that network.
+Since the Hetzner Cloud API only supports selecting a subnet when attaching a network to an existing server, the
+driver creates the server powered off, attaches these networks and powers the server on afterwards. Networks without
+an IP range are attached during server creation as before, i.e. before networks with an IP range. With
+`--hetzner-use-private-network`, the machine IP is taken from the first private network reported by the API.
+If all public IPs are disabled and every network has an IP range, the Hetzner Cloud API requires a temporary
+interface for server creation: the server is created with a public IPv6 address, which is unassigned and deleted
+again before the server is powered on for the first time. Firewalls are not applied in this case, since they only
+filter public traffic.
 
 ## Building from source
 

@@ -35,6 +35,8 @@ type Driver struct {
 	dangling          []func()
 	ServerID          int64
 	cachedServer      *hcloud.Server
+	deferredNetworks  []networkAttachment
+	temporaryIPv6     bool
 	userData          string
 	userDataFile      string
 	Volumes           []string
@@ -207,7 +209,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringSliceFlag{
 			EnvVar: "HETZNER_NETWORKS",
 			Name:   flagNetworks,
-			Usage:  "Network IDs or names which should be attached to the server private network interface",
+			Usage:  "Network IDs or names which should be attached to the server private network interface, optionally suffixed with :<ip-range> to select a subnet",
 			Value:  []string{},
 		},
 		mcnflag.BoolFlag{
@@ -503,6 +505,13 @@ func (d *Driver) Create() error {
 	}
 
 	d.ServerID = srv.Server.ID
+
+	if len(d.deferredNetworks) > 0 {
+		if err = d.attachDeferredNetworks(srv); err != nil {
+			return err
+		}
+	}
+
 	log.Infof(" -> Server %s[%d]: Waiting to come up...", srv.Server.Name, srv.Server.ID)
 
 	err = d.waitForInitialStartup(srv)
