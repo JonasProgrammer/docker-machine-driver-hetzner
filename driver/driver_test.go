@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -307,5 +308,91 @@ func assertMutualExclusion(t *testing.T, err error, flag1, flag2 string) {
 	errstr := err.Error()
 	if !strings.Contains(errstr, flag1) || !strings.Contains(errstr, flag2) || !strings.Contains(errstr, "mutually exclusive") {
 		t.Errorf("expected mutually exclusive flags to fail, but message differs: %v %v %v", flag1, flag2, errstr)
+	}
+}
+
+func TestParseNetworkSpec(t *testing.T) {
+	tests := []struct {
+		raw      string
+		idOrName string
+		ipRange  string
+	}{
+		{raw: "prod-net", idOrName: "prod-net"},
+		{raw: "12345", idOrName: "12345"},
+		{raw: "prod-net:192.168.20.0/24", idOrName: "prod-net", ipRange: "192.168.20.0/24"},
+		{raw: "12345:10.0.1.0/24", idOrName: "12345", ipRange: "10.0.1.0/24"},
+		{raw: "prod-net:192.168.20.5/24", idOrName: "prod-net:192.168.20.5/24"},
+		{raw: "team:prod", idOrName: "team:prod"},
+		{raw: "prod-net:not-a-cidr", idOrName: "prod-net:not-a-cidr"},
+		{raw: ":192.168.20.0/24", idOrName: ":192.168.20.0/24"},
+		{raw: "team:prod:10.0.1.0/24", idOrName: "team:prod", ipRange: "10.0.1.0/24"},
+		{raw: "prod-net:10.0.1.0", idOrName: "prod-net:10.0.1.0"},
+	}
+
+	for _, tt := range tests {
+		spec := parseNetworkSpec(tt.raw)
+		if spec.IDOrName != tt.idOrName {
+			t.Errorf("%q: expected id or name %q, got %q", tt.raw, tt.idOrName, spec.IDOrName)
+		}
+
+		ipRange := ""
+		if spec.IPRange != nil {
+			ipRange = spec.IPRange.String()
+		}
+		if ipRange != tt.ipRange {
+			t.Errorf("%q: expected ip range %q, got %q", tt.raw, tt.ipRange, ipRange)
+		}
+	}
+}
+
+func TestVerifySubnetExists(t *testing.T) {
+	_, appSubnet, _ := net.ParseCIDR("192.168.20.0/24")
+	_, dbSubnet, _ := net.ParseCIDR("192.168.30.0/24")
+	_, otherSubnet, _ := net.ParseCIDR("10.0.1.0/24")
+	_, narrowSubnet, _ := net.ParseCIDR("192.168.20.0/25")
+	network := &hcloud.Network{
+		Name: "prod-net",
+		Subnets: []hcloud.NetworkSubnet{
+			{Type: hcloud.NetworkSubnetTypeCloud},
+			{Type: hcloud.NetworkSubnetTypeCloud, IPRange: otherSubnet},
+			{Type: hcloud.NetworkSubnetTypeCloud, IPRange: appSubnet},
+		},
+	}
+
+	if err := verifySubnetExists(network, appSubnet); err != nil {
+		t.Errorf("unexpected error, %v", err)
+	}
+
+	if err := verifySubnetExists(network, narrowSubnet); err == nil {
+		t.Error("expected error for subnet with different prefix length")
+	}
+
+	err := verifySubnetExists(network, dbSubnet)
+	if err == nil {
+		t.Fatal("expected error for missing subnet")
+	}
+	if err.Error() != "network 'prod-net' has no subnet 192.168.30.0/24" {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestRequiresTemporaryPublicIPv6(t *testing.T) {
+	network := &hcloud.Network{ID: 1}
+	tests := []struct {
+		name     string
+		opts     hcloud.ServerCreateOpts
+		expected bool
+	}{
+		{name: "default public net", opts: hcloud.ServerCreateOpts{}, expected: false},
+		{name: "public disabled with network", opts: hcloud.ServerCreateOpts{PublicNet: &hcloud.ServerCreatePublicNet{}, Networks: []*hcloud.Network{network}}, expected: false},
+		{name: "public disabled without network", opts: hcloud.ServerCreateOpts{PublicNet: &hcloud.ServerCreatePublicNet{}}, expected: true},
+		{name: "only ipv4 disabled", opts: hcloud.ServerCreateOpts{PublicNet: &hcloud.ServerCreatePublicNet{EnableIPv6: true}}, expected: false},
+		{name: "only ipv6 disabled", opts: hcloud.ServerCreateOpts{PublicNet: &hcloud.ServerCreatePublicNet{EnableIPv4: true}}, expected: false},
+	}
+
+	for _, tt := range tests {
+		if actual := requiresTemporaryPublicIPv6(&tt.opts); actual != tt.expected {
+			t.Errorf("%s: expected %v, got %v", tt.name, tt.expected, actual)
+		}
 	}
 }

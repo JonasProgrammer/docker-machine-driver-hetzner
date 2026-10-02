@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/state"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
@@ -65,17 +66,29 @@ func (d *Driver) makeCreateServerOptions() (*hcloud.ServerCreateOpts, error) {
 		return nil, err
 	}
 
-	networks, err := d.createNetworks()
+	networks, deferredNetworks, err := d.createNetworks()
 	if err != nil {
 		return nil, err
 	}
 	srvopts.Networks = networks
+	d.deferredNetworks = deferredNetworks
+	d.temporaryIPv6 = len(deferredNetworks) > 0 && requiresTemporaryPublicIPv6(&srvopts)
+	if len(deferredNetworks) > 0 {
+		srvopts.StartAfterCreate = hcloud.Ptr(false)
+	}
+	if d.temporaryIPv6 {
+		srvopts.PublicNet.EnableIPv6 = true
+	}
 
 	firewalls, err := d.createFirewalls()
 	if err != nil {
 		return nil, err
 	}
-	srvopts.Firewalls = firewalls
+	if d.temporaryIPv6 && len(firewalls) > 0 {
+		log.Warnf("firewalls are not applied, since the server has no public network")
+	} else {
+		srvopts.Firewalls = firewalls
+	}
 
 	volumes, err := d.createVolumes()
 	if err != nil {
@@ -113,19 +126,30 @@ func (d *Driver) getUserData() (string, error) {
 	return string(readUserData), nil
 }
 
-func (d *Driver) createNetworks() ([]*hcloud.Network, error) {
+func (d *Driver) createNetworks() ([]*hcloud.Network, []networkAttachment, error) {
 	networks := []*hcloud.Network{}
-	for _, networkIDorName := range d.Networks {
-		network, _, err := d.getClient().Network.Get(context.Background(), networkIDorName)
+	deferred := []networkAttachment{}
+	for _, raw := range d.Networks {
+		spec := parseNetworkSpec(raw)
+		network, _, err := d.getClient().Network.Get(context.Background(), spec.IDOrName)
 		if err != nil {
-			return nil, fmt.Errorf("could not get network by ID or name: %w", err)
+			return nil, nil, fmt.Errorf("could not get network by ID or name: %w", err)
 		}
 		if network == nil {
-			return nil, fmt.Errorf("network '%s' not found", networkIDorName)
+			return nil, nil, fmt.Errorf("network '%s' not found", spec.IDOrName)
 		}
-		networks = append(networks, network)
+
+		if spec.IPRange == nil {
+			networks = append(networks, network)
+			continue
+		}
+
+		if err = verifySubnetExists(network, spec.IPRange); err != nil {
+			return nil, nil, err
+		}
+		deferred = append(deferred, networkAttachment{Network: network, IPRange: spec.IPRange})
 	}
-	return instrumented(networks), nil
+	return instrumented(networks), instrumented(deferred), nil
 }
 
 func (d *Driver) createFirewalls() ([]*hcloud.ServerCreateFirewall, error) {
